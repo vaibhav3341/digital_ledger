@@ -5,6 +5,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import { validateRecipientAccessCode } from '../services/firestore';
+import useSession from '../hooks/useSession';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
@@ -13,6 +14,7 @@ import { typography } from '../theme/typography';
 export default function RegisterAccessCodeScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { authUser, signOut } = useSession();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -39,6 +41,9 @@ export default function RegisterAccessCodeScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Register</Text>
       <Text style={styles.subtitle}>Enter access code to join as coworker</Text>
+      {authUser?.email ? (
+        <Text style={styles.accountHint}>Signed in as {authUser.email}</Text>
+      ) : null}
 
       <Input
         label="Access Code"
@@ -58,6 +63,11 @@ export default function RegisterAccessCodeScreen() {
         variant="ghost"
         onPress={() => navigation.navigate('RegisterProfile')}
       />
+      <Button
+        label="Use different Google account"
+        variant="ghost"
+        onPress={signOut}
+      />
     </View>
   );
 }
@@ -76,6 +86,11 @@ const styles = StyleSheet.create({
   subtitle: {
     ...typography.body,
     color: colors.muted,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.sm,
+  },
+  accountHint: {
+    ...typography.caption,
+    color: colors.muted,
+    marginBottom: spacing.lg,
   },
 });

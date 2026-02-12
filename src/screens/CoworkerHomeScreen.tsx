@@ -15,12 +15,24 @@ import {
 import { summarizeTransactions } from '../utils/transactions';
 
 export default function CoworkerHomeScreen() {
-  const { session, clearSession } = useSession();
+  const { session, signOut } = useSession();
   const recipientId = session?.role === 'COWORKER' ? session.recipientId : undefined;
   const recipientName =
     session?.role === 'COWORKER' ? session.recipientName : 'Recipient';
   const { transactions } = useRecipientTransactions(recipientId);
   const summary = summarizeTransactions(transactions);
+  const [signingOut, setSigningOut] = React.useState(false);
+
+  const handleSignOut = async () => {
+    try {
+      setSigningOut(true);
+      await signOut();
+    } catch (error) {
+      console.warn('Sign out failed', error);
+    } finally {
+      setSigningOut(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -29,7 +41,12 @@ export default function CoworkerHomeScreen() {
           <Text style={styles.title}>{recipientName}</Text>
           <Text style={styles.subtitle}>Your recipient ledger (view-only)</Text>
         </View>
-        <Button label="Reset" variant="ghost" onPress={clearSession} />
+        <Button
+          label={signingOut ? 'Signing out...' : 'Sign Out'}
+          variant="ghost"
+          onPress={handleSignOut}
+          disabled={signingOut}
+        />
       </View>
 
       <View style={styles.summaryCard}>

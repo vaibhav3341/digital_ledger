@@ -9,6 +9,29 @@ service cloud.firestore {
       return value in ['SENT', 'RECEIVED'];
     }
 
+    function validAppRole(value) {
+      return value in ['ADMIN', 'COWORKER'];
+    }
+
+    function nullableString(value) {
+      return value == null || nonEmptyString(value);
+    }
+
+    match /users/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list: if false;
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.uid == uid
+        && validAppRole(request.resource.data.role)
+        && nullableString(request.resource.data.adminId)
+        && nullableString(request.resource.data.ledgerId)
+        && nullableString(request.resource.data.recipientId)
+        && nullableString(request.resource.data.displayName)
+        && nullableString(request.resource.data.email);
+      allow delete: if false;
+    }
+
     match /admins/{adminId} {
       allow read: if true;
       allow create: if request.resource.data.adminId == adminId

@@ -49,16 +49,23 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function RootNavigator() {
-  const { session, loading } = useSession();
+  const { authUser, requiresRegistration, session, loading } = useSession();
 
   if (loading) {
     return <LoadingScreen />;
   }
 
-  if (!session) {
+  if (!authUser) {
     return (
       <Stack.Navigator>
         <Stack.Screen name="Welcome" component={WelcomeScreen} />
+      </Stack.Navigator>
+    );
+  }
+
+  if (requiresRegistration || !session) {
+    return (
+      <Stack.Navigator>
         <Stack.Screen
           name="RegisterAccessCode"
           component={RegisterAccessCodeScreen}

@@ -12,7 +12,20 @@
           "package_name": "com.digitalledgenative"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "901885032578-ltg0p75lrp51hl9c1bdt9dos0asnaeap.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.digitalledgenative",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "901885032578-4dcsrti5jis4nlef76msmnltvupeld27.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBY5TOCNNyd7K04fPhWMXUJC1yCfoVPuSg"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "901885032578-4dcsrti5jis4nlef76msmnltvupeld27.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

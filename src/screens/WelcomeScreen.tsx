@@ -1,26 +1,36 @@
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import React, { useState } from 'react';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import Button from '../components/Button';
-import { RootStackParamList } from '../navigation/RootNavigator';
+import { signInWithGoogle } from '../services/auth';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 
 export default function WelcomeScreen() {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const [loading, setLoading] = useState(false);
+
+  const handleGoogleContinue = async () => {
+    try {
+      setLoading(true);
+      await signInWithGoogle();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      Alert.alert('Google sign-in failed', message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Shared Ledger</Text>
       <Text style={styles.subtitle}>
-        Register as Admin or Coworker using your access code.
+        Continue with Google to access your admin or coworker ledger.
       </Text>
       <Button
-        label="Register"
-        onPress={() => navigation.navigate('RegisterAccessCode')}
+        label={loading ? 'Please wait...' : 'Continue with Google'}
+        onPress={handleGoogleContinue}
+        disabled={loading}
       />
     </View>
   );

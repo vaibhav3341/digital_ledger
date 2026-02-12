@@ -20,13 +20,14 @@ import { summarizeByRecipient } from '../utils/transactions';
 export default function AdminHomeScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { session, clearSession } = useSession();
+  const { session, signOut } = useSession();
   const ledgerId = session?.role === 'ADMIN' ? session.ledgerId : undefined;
   const { transactions } = useSharedTransactions(ledgerId);
   const { recipients } = useRecipients(ledgerId);
   const [activeTab, setActiveTab] = useState<'MASTER' | 'RECIPIENTS'>('MASTER');
   const [recipientName, setRecipientName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
 
   const summaryByRecipient = useMemo(
@@ -58,6 +59,17 @@ export default function AdminHomeScreen() {
     }
   };
 
+  const handleSignOut = async () => {
+    try {
+      setSigningOut(true);
+      await signOut();
+    } catch (error) {
+      Alert.alert('Sign out failed', String(error));
+    } finally {
+      setSigningOut(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
@@ -67,7 +79,12 @@ export default function AdminHomeScreen() {
             {session?.role === 'ADMIN' ? session.adminName : ''}
           </Text>
         </View>
-        <Button label="Reset" variant="ghost" onPress={clearSession} />
+        <Button
+          label={signingOut ? 'Signing out...' : 'Sign Out'}
+          variant="ghost"
+          onPress={handleSignOut}
+          disabled={signingOut}
+        />
       </View>
 
       <View style={styles.tabRow}>

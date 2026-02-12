@@ -86,7 +86,7 @@ export default function AddTransactionScreen() {
         amountCents: Math.round(parsedAmount * 100),
         note: note.trim() || undefined,
         txnAt: parsedDate,
-        createdByUid: session.adminId,
+        createdByUid: session.uid,
         recipientNameSnapshot: selectedRecipient?.recipientName,
       });
       navigation.goBack();

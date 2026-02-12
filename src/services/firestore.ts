@@ -230,8 +230,17 @@ async function createUniqueAccessCode(
   throw new Error('Unable to generate unique access code. Please try again.');
 }
 
-export async function createAdminAndLedger(params: { adminName: string }) {
+export async function createAdminAndLedger(params: {
+  adminName: string;
+  uid: string;
+  displayName?: string | null;
+  email?: string | null;
+}) {
+  const { uid, displayName, email } = params;
   const adminName = params.adminName.trim();
+  if (!uid.trim()) {
+    throw new Error('Signed-in user is required.');
+  }
   if (!adminName) {
     throw new Error('Admin name is required.');
   }
@@ -243,6 +252,7 @@ export async function createAdminAndLedger(params: { adminName: string }) {
 
   const adminRef = db.collection('admins').doc(adminId);
   const ledgerRef = db.collection('ledgers').doc(ledgerId);
+  const userRef = db.collection('users').doc(uid);
 
   batch.set(adminRef, {
     adminId,
@@ -254,6 +264,21 @@ export async function createAdminAndLedger(params: { adminName: string }) {
     adminId,
     createdAt: now,
   });
+  batch.set(
+    userRef,
+    {
+      uid,
+      role: 'ADMIN',
+      adminId,
+      ledgerId,
+      recipientId: null,
+      displayName: displayName || adminName,
+      email: email || null,
+      createdAt: now,
+      lastLoginAt: now,
+    },
+    { merge: true },
+  );
 
   await batch.commit();
 
@@ -304,16 +329,23 @@ export async function validateRecipientAccessCode(
 export async function registerCoworkerFromAccessCode(params: {
   code: string;
   coworkerName: string;
+  uid: string;
+  displayName?: string | null;
+  email?: string | null;
 }) {
   const normalizedCode = params.code.trim().toUpperCase();
   const coworkerName = params.coworkerName.trim();
   const normalizedCoworkerName = normalizeName(coworkerName);
+  const uid = params.uid.trim();
 
   if (!normalizedCode) {
     throw new Error('Access code is required.');
   }
   if (!coworkerName) {
     throw new Error('Name is required.');
+  }
+  if (!uid) {
+    throw new Error('Signed-in user is required.');
   }
 
   return db.runTransaction(async (transaction) => {
@@ -341,6 +373,15 @@ export async function registerCoworkerFromAccessCode(params: {
 
     if (
       codeData.status === 'USED' &&
+      codeData.usedByUid &&
+      codeData.usedByUid !== uid
+    ) {
+      throw new Error('This access code is already linked to another account.');
+    }
+
+    if (
+      codeData.status === 'USED' &&
+      !codeData.usedByUid &&
       codeData.joinedNameNormalized &&
       codeData.joinedNameNormalized !== normalizedCoworkerName
     ) {
@@ -354,6 +395,9 @@ export async function registerCoworkerFromAccessCode(params: {
       accessCodeUpdates.status = 'USED';
       accessCodeUpdates.usedAt = now;
     }
+    if (!codeData.usedByUid) {
+      accessCodeUpdates.usedByUid = uid;
+    }
     if (!codeData.joinedNameNormalized) {
       accessCodeUpdates.joinedName = coworkerName;
       accessCodeUpdates.joinedNameNormalized = normalizedCoworkerName;
@@ -364,12 +408,35 @@ export async function registerCoworkerFromAccessCode(params: {
 
     const recipientUpdates: Record<string, unknown> = {
       status: 'JOINED',
+      joinedUid: uid,
       joinedName: coworkerName,
     };
     if (!recipient.joinedAt) {
       recipientUpdates.joinedAt = now;
     }
     transaction.update(recipientRef, recipientUpdates);
+
+    const userRef = db.collection('users').doc(uid);
+    const userSnap = await transaction.get(userRef);
+    const existingCreatedAt = userSnap.exists()
+      ? (userSnap.data()?.createdAt ?? now)
+      : now;
+
+    transaction.set(
+      userRef,
+      {
+        uid,
+        role: 'COWORKER',
+        adminId: null,
+        ledgerId: codeData.ledgerId,
+        recipientId: recipient.recipientId,
+        displayName: params.displayName || coworkerName,
+        email: params.email || null,
+        createdAt: existingCreatedAt,
+        lastLoginAt: now,
+      },
+      { merge: true },
+    );
 
     return {
       code: normalizedCode,
@@ -407,6 +474,7 @@ export async function createRecipientWithAccessCode(params: {
       status: 'INVITED',
       createdAt: now,
       joinedAt: null,
+      joinedUid: null,
       joinedName: null,
     });
 
@@ -417,12 +485,42 @@ export async function createRecipientWithAccessCode(params: {
       status: 'ACTIVE',
       createdAt: now,
       usedAt: null,
+      usedByUid: null,
       joinedName: null,
       joinedNameNormalized: null,
     });
 
     return { recipientId, code };
   });
+}
+
+export async function touchUserLastLoginIfExists(params: {
+  uid: string;
+  displayName?: string | null;
+  email?: string | null;
+}) {
+  const uid = params.uid.trim();
+  if (!uid) {
+    return false;
+  }
+
+  const userRef = db.collection('users').doc(uid);
+  const userSnap = await userRef.get();
+  if (!userSnap.exists()) {
+    return false;
+  }
+
+  await userRef.set(
+    {
+      uid,
+      displayName: params.displayName || null,
+      email: params.email || null,
+      lastLoginAt: firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
+
+  return true;
 }
 
 export async function createSharedLedgerTransaction(params: {
