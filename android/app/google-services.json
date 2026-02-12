@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "901885032578",
+    "project_id": "digital-ledge",
+    "storage_bucket": "digital-ledge.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:901885032578:android:47aa8d72e8c52372f7dc9b",
+        "android_client_info": {
+          "package_name": "com.digitalledgenative"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBY5TOCNNyd7K04fPhWMXUJC1yCfoVPuSg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

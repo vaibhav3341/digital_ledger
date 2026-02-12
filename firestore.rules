@@ -1,0 +1,86 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function nonEmptyString(value) {
+      return value is string && value.size() > 0;
+    }
+
+    function validDirection(value) {
+      return value in ['SENT', 'RECEIVED'];
+    }
+
+    match /admins/{adminId} {
+      allow read: if true;
+      allow create: if request.resource.data.adminId == adminId
+        && nonEmptyString(request.resource.data.adminName);
+      allow update, delete: if false;
+    }
+
+    match /ledgers/{ledgerId} {
+      allow read: if true;
+      allow create: if request.resource.data.ledgerId == ledgerId
+        && nonEmptyString(request.resource.data.adminId);
+      allow update, delete: if false;
+    }
+
+    match /recipients/{recipientId} {
+      allow read: if true;
+      allow create: if request.resource.data.recipientId == recipientId
+        && nonEmptyString(request.resource.data.ledgerId)
+        && nonEmptyString(request.resource.data.recipientName)
+        && request.resource.data.status == 'INVITED';
+      allow update: if request.resource.data.recipientId == resource.data.recipientId
+        && request.resource.data.ledgerId == resource.data.ledgerId
+        && request.resource.data.recipientName == resource.data.recipientName
+        && request.resource.data.status in ['INVITED', 'JOINED']
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if false;
+    }
+
+    match /accessCodes/{code} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if request.resource.data.code == code
+        && nonEmptyString(request.resource.data.recipientId)
+        && nonEmptyString(request.resource.data.ledgerId)
+        && request.resource.data.status == 'ACTIVE';
+      allow update: if request.resource.data.code == resource.data.code
+        && request.resource.data.recipientId == resource.data.recipientId
+        && request.resource.data.ledgerId == resource.data.ledgerId
+        && request.resource.data.status in ['ACTIVE', 'USED'];
+      allow delete: if false;
+    }
+
+    match /transactions/{txnId} {
+      allow read: if true;
+      allow create: if request.resource.data.txnId == txnId
+        && nonEmptyString(request.resource.data.ledgerId)
+        && nonEmptyString(request.resource.data.recipientId)
+        && nonEmptyString(request.resource.data.recipientNameSnapshot)
+        && request.resource.data.amountCents is int
+        && request.resource.data.amountCents > 0
+        && nonEmptyString(request.resource.data.createdByUid)
+        && request.resource.data.createdByRole == 'ADMIN'
+        && validDirection(request.resource.data.direction);
+      allow update, delete: if false;
+    }
+
+    match /recipientSummaries/{recipientId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.recipientId == recipientId
+        && nonEmptyString(request.resource.data.ledgerId)
+        && request.resource.data.totalSentCents is int
+        && request.resource.data.totalReceivedCents is int
+        && request.resource.data.netCents is int;
+      allow delete: if false;
+    }
+
+    match /ledgerSummaries/{ledgerId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.ledgerId == ledgerId
+        && request.resource.data.totalSentCents is int
+        && request.resource.data.totalReceivedCents is int;
+      allow delete: if false;
+    }
+  }
+}
