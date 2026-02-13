@@ -29,7 +29,7 @@ export default function useAuth() {
       .collection('users')
       .doc(authUser.uid)
       .onSnapshot((snap) => {
-        if (snap.exists) {
+        if (snap.exists()) {
           setProfile(snap.data() as UserProfile);
         } else {
           setProfile(null);

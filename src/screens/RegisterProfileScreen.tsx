@@ -40,7 +40,7 @@ function withTimeout<T>(task: Promise<T>, context: string): Promise<T> {
 export default function RegisterProfileScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'RegisterProfile'>>();
   const validatedCode = route.params?.validatedCode;
-  const { setSession } = useSession();
+  const { authUser, setSession, signOut } = useSession();
   const [name, setName] = useState('');
   const [role, setRole] = useState<'ADMIN' | 'COWORKER'>(
     validatedCode ? 'COWORKER' : 'ADMIN',
@@ -58,6 +58,11 @@ export default function RegisterProfileScreen() {
   }, [role, validatedCode]);
 
   const handleContinue = async () => {
+    if (!authUser) {
+      Alert.alert('Sign-in required', 'Please continue with Google first.');
+      return;
+    }
+
     if (!name.trim()) {
       Alert.alert('Enter your name');
       return;
@@ -69,10 +74,14 @@ export default function RegisterProfileScreen() {
         const result = await withTimeout(
           createAdminAndLedger({
             adminName: name.trim(),
+            uid: authUser.uid,
+            displayName: authUser.displayName || name.trim(),
+            email: authUser.email || null,
           }),
           'Admin registration',
         );
         setSession({
+          uid: authUser.uid,
           role: 'ADMIN',
           adminId: result.adminId,
           adminName: result.adminName,
@@ -90,10 +99,14 @@ export default function RegisterProfileScreen() {
         registerCoworkerFromAccessCode({
           code: validatedCode.code,
           coworkerName: name.trim(),
+          uid: authUser.uid,
+          displayName: authUser.displayName || name.trim(),
+          email: authUser.email || null,
         }),
         'Coworker registration',
       );
       setSession({
+        uid: authUser.uid,
         role: 'COWORKER',
         coworkerName: name.trim(),
         recipientId: result.recipientId,
@@ -114,6 +127,9 @@ export default function RegisterProfileScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Profile Setup</Text>
       <Text style={styles.subtitle}>{roleSubtitle}</Text>
+      {authUser?.email ? (
+        <Text style={styles.accountHint}>Signed in as {authUser.email}</Text>
+      ) : null}
 
       <Input
         label="Name"
@@ -142,6 +158,12 @@ export default function RegisterProfileScreen() {
         onPress={handleContinue}
         disabled={loading}
       />
+      <Button
+        label="Use different Google account"
+        variant="ghost"
+        onPress={signOut}
+        disabled={loading}
+      />
     </View>
   );
 }
@@ -160,7 +182,12 @@ const styles = StyleSheet.create({
   subtitle: {
     ...typography.body,
     color: colors.muted,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.sm,
+  },
+  accountHint: {
+    ...typography.caption,
+    color: colors.muted,
+    marginBottom: spacing.lg,
   },
   roleRow: {
     flexDirection: 'row',

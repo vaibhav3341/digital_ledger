@@ -1,6 +1,6 @@
 import { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 
-export type UserRole = 'OWNER' | 'COWORKER';
+export type UserRole = 'OWNER' | 'ADMIN' | 'COWORKER';
 
 export type TransactionType = 'PAID_TO_COWORKER' | 'RECEIVED_FROM_COWORKER';
 
@@ -83,6 +83,7 @@ export interface Recipient {
   status: RecipientStatus;
   createdAt: FirebaseFirestoreTypes.Timestamp;
   joinedAt?: FirebaseFirestoreTypes.Timestamp | null;
+  joinedUid?: string | null;
   joinedName?: string | null;
 }
 
@@ -93,6 +94,7 @@ export interface AccessCode {
   status: AccessCodeStatus;
   createdAt: FirebaseFirestoreTypes.Timestamp;
   usedAt?: FirebaseFirestoreTypes.Timestamp | null;
+  usedByUid?: string | null;
   joinedName?: string | null;
   joinedNameNormalized?: string | null;
 }
@@ -148,6 +150,18 @@ export interface LedgerSummary {
   lastTxnAt?: FirebaseFirestoreTypes.Timestamp | null;
 }
 
+export interface AppUserRecord {
+  uid: string;
+  role: AppRole;
+  adminId: string | null;
+  ledgerId: string | null;
+  recipientId: string | null;
+  displayName: string | null;
+  email: string | null;
+  createdAt?: FirebaseFirestoreTypes.Timestamp;
+  lastLoginAt?: FirebaseFirestoreTypes.Timestamp;
+}
+
 export interface ValidatedAccessCode {
   code: string;
   ledgerId: string;
@@ -159,6 +173,7 @@ export interface ValidatedAccessCode {
 }
 
 export interface AdminSession {
+  uid: string;
   role: 'ADMIN';
   adminId: string;
   adminName: string;
@@ -166,6 +181,7 @@ export interface AdminSession {
 }
 
 export interface CoworkerSession {
+  uid: string;
   role: 'COWORKER';
   coworkerName: string;
   recipientId: string;
