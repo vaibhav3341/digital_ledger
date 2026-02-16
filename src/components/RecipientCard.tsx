@@ -8,6 +8,7 @@ import { formatSignedAmountFromCents } from '../utils/format';
 
 interface RecipientCardProps {
   name: string;
+  phoneNumber: string;
   status: RecipientStatus;
   netCents: number;
   onOpen: () => void;
@@ -17,6 +18,7 @@ interface RecipientCardProps {
 
 export default function RecipientCard({
   name,
+  phoneNumber,
   status,
   netCents,
   onOpen,
@@ -32,6 +34,7 @@ export default function RecipientCard({
         <Text style={styles.name}>{name}</Text>
         <Text style={[styles.status, { color: statusColor }]}>{status}</Text>
       </View>
+      <Text style={styles.phone}>{phoneNumber}</Text>
       <Text style={[styles.net, { color: netColor }]}>
         Net: {formatSignedAmountFromCents(netCents)}
       </Text>
@@ -76,6 +79,11 @@ const styles = StyleSheet.create({
   status: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  phone: {
+    marginTop: spacing.xs,
+    fontSize: 12,
+    color: colors.muted,
   },
   net: {
     marginTop: spacing.sm,

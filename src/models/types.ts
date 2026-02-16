@@ -56,8 +56,6 @@ export type AppRole = 'ADMIN' | 'COWORKER';
 
 export type RecipientStatus = 'INVITED' | 'JOINED';
 
-export type AccessCodeStatus = 'ACTIVE' | 'USED';
-
 export type SharedTransactionType = 'ADD' | 'SEND' | 'RECEIVE';
 
 export type RecipientTransactionType = 'SEND' | 'RECEIVE';
@@ -67,6 +65,7 @@ export type TransactionDirection = 'SENT' | 'RECEIVED';
 export interface AdminProfile {
   adminId: string;
   adminName: string;
+  adminPhoneNormalized?: string;
   createdAt: FirebaseFirestoreTypes.Timestamp;
 }
 
@@ -80,6 +79,8 @@ export interface Recipient {
   recipientId: string;
   ledgerId: string;
   recipientName: string;
+  phoneNumber: string;
+  phoneNormalized: string;
   status: RecipientStatus;
   createdAt: FirebaseFirestoreTypes.Timestamp;
   joinedAt?: FirebaseFirestoreTypes.Timestamp | null;
@@ -87,16 +88,14 @@ export interface Recipient {
   joinedName?: string | null;
 }
 
-export interface AccessCode {
-  code: string;
+export interface RecipientPhoneMapping {
+  phoneNormalized: string;
+  phoneNumber: string;
   recipientId: string;
   ledgerId: string;
-  status: AccessCodeStatus;
+  recipientName: string;
   createdAt: FirebaseFirestoreTypes.Timestamp;
-  usedAt?: FirebaseFirestoreTypes.Timestamp | null;
-  usedByUid?: string | null;
-  joinedName?: string | null;
-  joinedNameNormalized?: string | null;
+  updatedAt: FirebaseFirestoreTypes.Timestamp;
 }
 
 export interface SharedLedgerTransaction {
@@ -162,16 +161,6 @@ export interface AppUserRecord {
   lastLoginAt?: FirebaseFirestoreTypes.Timestamp;
 }
 
-export interface ValidatedAccessCode {
-  code: string;
-  ledgerId: string;
-  recipientId: string;
-  recipientName: string;
-  status: AccessCodeStatus;
-  joinedName?: string | null;
-  joinedNameNormalized?: string | null;
-}
-
 export interface AdminSession {
   uid: string;
   role: 'ADMIN';
@@ -187,7 +176,6 @@ export interface CoworkerSession {
   recipientId: string;
   recipientName: string;
   ledgerId: string;
-  accessCode: string;
 }
 
 export type AppSession = AdminSession | CoworkerSession;

@@ -1,17 +1,18 @@
-import firestore, {
-  FirebaseFirestoreTypes,
-} from '@react-native-firebase/firestore';
+import firestore from '@react-native-firebase/firestore';
 import {
-  AccessCode,
+  AdminSession,
+  AppSession,
+  CoworkerSession,
   LedgerTransaction,
+  RecipientPhoneMapping,
   Recipient as RecipientModel,
   TransactionDirection,
   RecipientTransactionType,
   SharedTransactionType,
   Transaction,
   TransactionType,
-  ValidatedAccessCode,
 } from '../models/types';
+import { ADMIN_WHITELIST } from '../config/adminWhitelist';
 import { createUuid } from '../utils/uuid';
 import { generateInviteCode } from './invites';
 
@@ -212,35 +213,35 @@ export async function deleteTransaction(params: {
   });
 }
 
-function normalizeName(name: string) {
-  return name.trim().toLowerCase().replace(/\s+/g, ' ');
+export function normalizePhoneNumber(phoneNumber: string) {
+  return phoneNumber.replace(/\D+/g, '').trim();
 }
 
-async function createUniqueAccessCode(
-  transaction: FirebaseFirestoreTypes.Transaction,
-) {
-  for (let i = 0; i < 10; i += 1) {
-    const code = generateInviteCode();
-    const codeRef = db.collection('accessCodes').doc(code);
-    const existing = await transaction.get(codeRef);
-    if (!existing.exists()) {
-      return code;
-    }
+function assertPhoneNumber(phoneNumber: string) {
+  const normalized = normalizePhoneNumber(phoneNumber);
+  if (normalized.length < 10) {
+    throw new Error('Enter a valid phone number.');
   }
-  throw new Error('Unable to generate unique access code. Please try again.');
+  return normalized;
+}
+
+function adminSessionIdentifiers(phoneNormalized: string) {
+  return {
+    adminId: `admin_${phoneNormalized}`,
+    ledgerId: `ledger_${phoneNormalized}`,
+    uid: `admin_${phoneNormalized}`,
+  };
 }
 
 export async function createAdminAndLedger(params: {
   adminName: string;
-  uid: string;
+  uid?: string;
   displayName?: string | null;
   email?: string | null;
+  adminPhoneNormalized?: string;
 }) {
-  const { uid, displayName, email } = params;
+  const { uid, displayName, email, adminPhoneNormalized } = params;
   const adminName = params.adminName.trim();
-  if (!uid.trim()) {
-    throw new Error('Signed-in user is required.');
-  }
   if (!adminName) {
     throw new Error('Admin name is required.');
   }
@@ -252,11 +253,11 @@ export async function createAdminAndLedger(params: {
 
   const adminRef = db.collection('admins').doc(adminId);
   const ledgerRef = db.collection('ledgers').doc(ledgerId);
-  const userRef = db.collection('users').doc(uid);
 
   batch.set(adminRef, {
     adminId,
     adminName,
+    adminPhoneNormalized: adminPhoneNormalized || null,
     createdAt: now,
   });
   batch.set(ledgerRef, {
@@ -264,195 +265,87 @@ export async function createAdminAndLedger(params: {
     adminId,
     createdAt: now,
   });
-  batch.set(
-    userRef,
-    {
-      uid,
-      role: 'ADMIN',
-      adminId,
-      ledgerId,
-      recipientId: null,
-      displayName: displayName || adminName,
-      email: email || null,
-      createdAt: now,
-      lastLoginAt: now,
-    },
-    { merge: true },
-  );
+
+  if (uid?.trim()) {
+    const userRef = db.collection('users').doc(uid);
+    batch.set(
+      userRef,
+      {
+        uid,
+        role: 'ADMIN',
+        adminId,
+        ledgerId,
+        recipientId: null,
+        displayName: displayName || adminName,
+        email: email || null,
+        createdAt: now,
+        lastLoginAt: now,
+      },
+      { merge: true },
+    );
+  }
 
   await batch.commit();
 
   return { adminId, adminName, ledgerId };
 }
 
-export async function validateRecipientAccessCode(
-  code: string,
-): Promise<ValidatedAccessCode> {
-  const normalizedCode = code.trim().toUpperCase();
-  if (!normalizedCode) {
-    throw new Error('Access code is required.');
-  }
+function findWhitelistedAdmin(phoneNormalized: string) {
+  return ADMIN_WHITELIST.find(
+    (entry) => normalizePhoneNumber(entry.phoneNumber) === phoneNormalized,
+  );
+}
 
-  const codeRef = db.collection('accessCodes').doc(normalizedCode);
-  const codeSnap = await codeRef.get();
-  if (!codeSnap.exists()) {
-    throw new Error('Access code not found.');
-  }
+async function ensureAdminSessionFromWhitelist(
+  phoneNormalized: string,
+  adminName: string,
+): Promise<AdminSession> {
+  const { adminId, ledgerId, uid } = adminSessionIdentifiers(phoneNormalized);
+  const adminRef = db.collection('admins').doc(adminId);
+  const ledgerRef = db.collection('ledgers').doc(ledgerId);
 
-  const codeData = codeSnap.data() as AccessCode;
-  if (codeData.status !== 'ACTIVE' && codeData.status !== 'USED') {
-    throw new Error('Access code is not active.');
-  }
+  const [adminSnap, ledgerSnap] = await Promise.all([adminRef.get(), ledgerRef.get()]);
+  const now = firestore.FieldValue.serverTimestamp();
 
-  const recipientRef = db.collection('recipients').doc(codeData.recipientId);
-  const recipientSnap = await recipientRef.get();
-  if (!recipientSnap.exists()) {
-    throw new Error('Recipient slot not found for this code.');
+  const batch = db.batch();
+  if (!adminSnap.exists()) {
+    batch.set(adminRef, {
+      adminId,
+      adminName,
+      adminPhoneNormalized: phoneNormalized,
+      createdAt: now,
+    });
   }
-
-  const recipient = recipientSnap.data() as RecipientModel;
-  if (recipient.ledgerId !== codeData.ledgerId) {
-    throw new Error('Access code mapping is invalid.');
+  if (!ledgerSnap.exists()) {
+    batch.set(ledgerRef, {
+      ledgerId,
+      adminId,
+      createdAt: now,
+    });
+  }
+  if (!adminSnap.exists() || !ledgerSnap.exists()) {
+    await batch.commit();
   }
 
   return {
-    code: normalizedCode,
-    ledgerId: codeData.ledgerId,
-    recipientId: codeData.recipientId,
-    recipientName: recipient.recipientName,
-    status: codeData.status,
-    joinedName: codeData.joinedName || null,
-    joinedNameNormalized: codeData.joinedNameNormalized || null,
+    uid,
+    role: 'ADMIN',
+    adminId,
+    adminName: (adminSnap.data()?.adminName as string | undefined) || adminName,
+    ledgerId,
   };
 }
 
-export async function registerCoworkerFromAccessCode(params: {
-  code: string;
-  coworkerName: string;
-  uid: string;
-  displayName?: string | null;
-  email?: string | null;
-}) {
-  const normalizedCode = params.code.trim().toUpperCase();
-  const coworkerName = params.coworkerName.trim();
-  const normalizedCoworkerName = normalizeName(coworkerName);
-  const uid = params.uid.trim();
-
-  if (!normalizedCode) {
-    throw new Error('Access code is required.');
-  }
-  if (!coworkerName) {
-    throw new Error('Name is required.');
-  }
-  if (!uid) {
-    throw new Error('Signed-in user is required.');
-  }
-
-  return db.runTransaction(async (transaction) => {
-    const codeRef = db.collection('accessCodes').doc(normalizedCode);
-    const codeSnap = await transaction.get(codeRef);
-    if (!codeSnap.exists()) {
-      throw new Error('Access code not found.');
-    }
-
-    const codeData = codeSnap.data() as AccessCode;
-    if (codeData.status !== 'ACTIVE' && codeData.status !== 'USED') {
-      throw new Error('Access code is not active.');
-    }
-
-    const recipientRef = db.collection('recipients').doc(codeData.recipientId);
-    const recipientSnap = await transaction.get(recipientRef);
-    if (!recipientSnap.exists()) {
-      throw new Error('Recipient slot not found.');
-    }
-
-    const recipient = recipientSnap.data() as RecipientModel;
-    if (recipient.ledgerId !== codeData.ledgerId) {
-      throw new Error('Access code mapping is invalid.');
-    }
-
-    if (
-      codeData.status === 'USED' &&
-      codeData.usedByUid &&
-      codeData.usedByUid !== uid
-    ) {
-      throw new Error('This access code is already linked to another account.');
-    }
-
-    if (
-      codeData.status === 'USED' &&
-      !codeData.usedByUid &&
-      codeData.joinedNameNormalized &&
-      codeData.joinedNameNormalized !== normalizedCoworkerName
-    ) {
-      throw new Error('This access code is already linked to another name.');
-    }
-
-    const now = firestore.FieldValue.serverTimestamp();
-    const accessCodeUpdates: Record<string, unknown> = {};
-
-    if (codeData.status === 'ACTIVE') {
-      accessCodeUpdates.status = 'USED';
-      accessCodeUpdates.usedAt = now;
-    }
-    if (!codeData.usedByUid) {
-      accessCodeUpdates.usedByUid = uid;
-    }
-    if (!codeData.joinedNameNormalized) {
-      accessCodeUpdates.joinedName = coworkerName;
-      accessCodeUpdates.joinedNameNormalized = normalizedCoworkerName;
-    }
-    if (Object.keys(accessCodeUpdates).length > 0) {
-      transaction.update(codeRef, accessCodeUpdates);
-    }
-
-    const recipientUpdates: Record<string, unknown> = {
-      status: 'JOINED',
-      joinedUid: uid,
-      joinedName: coworkerName,
-    };
-    if (!recipient.joinedAt) {
-      recipientUpdates.joinedAt = now;
-    }
-    transaction.update(recipientRef, recipientUpdates);
-
-    const userRef = db.collection('users').doc(uid);
-    const userSnap = await transaction.get(userRef);
-    const existingCreatedAt = userSnap.exists()
-      ? (userSnap.data()?.createdAt ?? now)
-      : now;
-
-    transaction.set(
-      userRef,
-      {
-        uid,
-        role: 'COWORKER',
-        adminId: null,
-        ledgerId: codeData.ledgerId,
-        recipientId: recipient.recipientId,
-        displayName: params.displayName || coworkerName,
-        email: params.email || null,
-        createdAt: existingCreatedAt,
-        lastLoginAt: now,
-      },
-      { merge: true },
-    );
-
-    return {
-      code: normalizedCode,
-      ledgerId: codeData.ledgerId,
-      recipientId: recipient.recipientId,
-      recipientName: recipient.recipientName,
-    };
-  });
-}
-
-export async function createRecipientWithAccessCode(params: {
+export async function createRecipientWithPhone(params: {
   ledgerId: string;
   recipientName: string;
+  phoneNumber: string;
 }) {
   const ledgerId = params.ledgerId.trim();
   const recipientName = params.recipientName.trim();
+  const phoneNumber = params.phoneNumber.trim();
+  const phoneNormalized = assertPhoneNumber(phoneNumber);
+
   if (!ledgerId) {
     throw new Error('Ledger is required.');
   }
@@ -461,16 +354,24 @@ export async function createRecipientWithAccessCode(params: {
   }
 
   return db.runTransaction(async (transaction) => {
+    const phoneMappingRef = db
+      .collection('recipientPhoneMappings')
+      .doc(phoneNormalized);
+    const existingMappingSnap = await transaction.get(phoneMappingRef);
+    if (existingMappingSnap.exists()) {
+      throw new Error('This phone number is already registered to a recipient.');
+    }
+
     const recipientRef = db.collection('recipients').doc();
     const recipientId = recipientRef.id;
-    const code = await createUniqueAccessCode(transaction);
-    const codeRef = db.collection('accessCodes').doc(code);
     const now = firestore.FieldValue.serverTimestamp();
 
     transaction.set(recipientRef, {
       recipientId,
       ledgerId,
       recipientName,
+      phoneNumber,
+      phoneNormalized,
       status: 'INVITED',
       createdAt: now,
       joinedAt: null,
@@ -478,20 +379,110 @@ export async function createRecipientWithAccessCode(params: {
       joinedName: null,
     });
 
-    transaction.set(codeRef, {
-      code,
+    const phoneMapping: Omit<RecipientPhoneMapping, 'createdAt' | 'updatedAt'> = {
+      phoneNormalized,
+      phoneNumber,
       recipientId,
       ledgerId,
-      status: 'ACTIVE',
+      recipientName,
+    };
+    transaction.set(phoneMappingRef, {
+      ...phoneMapping,
       createdAt: now,
-      usedAt: null,
-      usedByUid: null,
-      joinedName: null,
-      joinedNameNormalized: null,
+      updatedAt: now,
     });
 
-    return { recipientId, code };
+    return { recipientId };
   });
+}
+
+export async function resolveSessionByPhone(
+  phoneNumber: string,
+): Promise<AppSession | null> {
+  const phoneNormalized = assertPhoneNumber(phoneNumber);
+  const whitelistedAdmin = findWhitelistedAdmin(phoneNormalized);
+  if (whitelistedAdmin) {
+    return ensureAdminSessionFromWhitelist(
+      phoneNormalized,
+      whitelistedAdmin.adminName.trim(),
+    );
+  }
+
+  const phoneMappingRef = db
+    .collection('recipientPhoneMappings')
+    .doc(phoneNormalized);
+  const phoneMappingSnap = await phoneMappingRef.get();
+  let mapping: RecipientPhoneMapping | null = null;
+
+  if (!phoneMappingSnap.exists()) {
+    const recipientsByPhone = await db
+      .collection('recipients')
+      .where('phoneNormalized', '==', phoneNormalized)
+      .limit(1)
+      .get();
+    if (recipientsByPhone.empty) {
+      return null;
+    }
+
+    const fallbackRecipient = recipientsByPhone.docs[0].data() as RecipientModel;
+    mapping = {
+      phoneNormalized,
+      phoneNumber: fallbackRecipient.phoneNumber || phoneNumber.trim(),
+      recipientId: fallbackRecipient.recipientId,
+      ledgerId: fallbackRecipient.ledgerId,
+      recipientName: fallbackRecipient.recipientName,
+      createdAt: fallbackRecipient.createdAt,
+      updatedAt: fallbackRecipient.createdAt,
+    };
+
+    await phoneMappingRef.set({
+      phoneNormalized,
+      phoneNumber: mapping.phoneNumber,
+      recipientId: mapping.recipientId,
+      ledgerId: mapping.ledgerId,
+      recipientName: mapping.recipientName,
+      createdAt: firestore.FieldValue.serverTimestamp(),
+      updatedAt: firestore.FieldValue.serverTimestamp(),
+    });
+  } else {
+    mapping = phoneMappingSnap.data() as RecipientPhoneMapping;
+  }
+
+  if (!mapping) {
+    return null;
+  }
+
+  const recipientRef = db.collection('recipients').doc(mapping.recipientId);
+  const recipientSnap = await recipientRef.get();
+  if (!recipientSnap.exists()) {
+    await phoneMappingRef.delete();
+    return null;
+  }
+
+  const recipient = recipientSnap.data() as RecipientModel;
+  if (recipient.ledgerId !== mapping.ledgerId) {
+    return null;
+  }
+
+  if (recipient.status !== 'JOINED') {
+    await recipientRef.update({
+      status: 'JOINED',
+      joinedAt: firestore.FieldValue.serverTimestamp(),
+      joinedName: recipient.recipientName,
+      joinedUid: `recipient_${phoneNormalized}`,
+    });
+  }
+
+  const coworkerSession: CoworkerSession = {
+    uid: `recipient_${phoneNormalized}`,
+    role: 'COWORKER',
+    coworkerName: recipient.recipientName,
+    recipientId: recipient.recipientId,
+    recipientName: recipient.recipientName,
+    ledgerId: recipient.ledgerId,
+  };
+
+  return coworkerSession;
 }
 
 export async function touchUserLastLoginIfExists(params: {
