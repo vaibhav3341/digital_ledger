@@ -60,17 +60,16 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    match /accessCodes/{code} {
-      allow get: if true;
-      allow list: if false;
-      allow create: if request.resource.data.code == code
+    match /recipientPhoneMappings/{phoneNormalized} {
+      allow read: if true;
+      allow create: if request.resource.data.phoneNormalized == phoneNormalized
+        && nonEmptyString(request.resource.data.phoneNumber)
         && nonEmptyString(request.resource.data.recipientId)
         && nonEmptyString(request.resource.data.ledgerId)
-        && request.resource.data.status == 'ACTIVE';
-      allow update: if request.resource.data.code == resource.data.code
+        && nonEmptyString(request.resource.data.recipientName);
+      allow update: if request.resource.data.phoneNormalized == resource.data.phoneNormalized
         && request.resource.data.recipientId == resource.data.recipientId
-        && request.resource.data.ledgerId == resource.data.ledgerId
-        && request.resource.data.status in ['ACTIVE', 'USED'];
+        && request.resource.data.ledgerId == resource.data.ledgerId;
       allow delete: if false;
     }
 

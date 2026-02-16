@@ -1,81 +1,44 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import useSession from '../hooks/useSession';
-import { RecipientTransactionType, SharedTransactionType, ValidatedAccessCode } from '../models/types';
 import LoadingScreen from '../screens/LoadingScreen';
 import WelcomeScreen from '../screens/WelcomeScreen';
-import RegisterAccessCodeScreen from '../screens/RegisterAccessCodeScreen';
-import RegisterProfileScreen from '../screens/RegisterProfileScreen';
 import AdminHomeScreen from '../screens/AdminHomeScreen';
 import RecipientLedgerScreen from '../screens/RecipientLedgerScreen';
 import CoworkerHomeScreen from '../screens/CoworkerHomeScreen';
 import AddTransactionScreen from '../screens/AddTransactionScreen';
+import AddRecipientScreen from '../screens/AddRecipientScreen';
 
 export type RootStackParamList = {
   Welcome: undefined;
-  RegisterAccessCode: undefined;
-  RegisterProfile: { validatedCode?: ValidatedAccessCode } | undefined;
   AdminHome: undefined;
-  RecipientsList: undefined;
   RecipientLedger: {
     recipientId: string;
     recipientName: string;
     isReadOnly: boolean;
-  };
-  AddSharedTransaction: {
-    initialType: SharedTransactionType;
-  };
-  AddRecipientTransaction: {
-    recipientId: string;
-    recipientName: string;
-    initialType: RecipientTransactionType;
   };
   AddTransaction: {
     recipientId?: string;
     recipientName?: string;
     initialDirection?: 'SENT' | 'RECEIVED';
   };
+  AddRecipient: undefined;
   CoworkerHome: undefined;
-  Auth: undefined;
-  RoleSelect: undefined;
-  JoinInvite: { name: string; phone?: string } | undefined;
-  OwnerHome: undefined;
-  CoworkerDetail: { coworkerId: string; name: string };
-  AddEditTransaction: { coworkerId: string; txnId?: string };
-  InviteCoworker: undefined;
-  CoworkerLedger: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function RootNavigator() {
-  const { authUser, requiresRegistration, session, loading } = useSession();
+  const { session, loading } = useSession();
 
   if (loading) {
     return <LoadingScreen />;
   }
 
-  if (!authUser) {
+  if (!session) {
     return (
       <Stack.Navigator>
         <Stack.Screen name="Welcome" component={WelcomeScreen} />
-      </Stack.Navigator>
-    );
-  }
-
-  if (requiresRegistration || !session) {
-    return (
-      <Stack.Navigator>
-        <Stack.Screen
-          name="RegisterAccessCode"
-          component={RegisterAccessCodeScreen}
-          options={{ title: 'Access Code' }}
-        />
-        <Stack.Screen
-          name="RegisterProfile"
-          component={RegisterProfileScreen}
-          options={{ title: 'Profile' }}
-        />
       </Stack.Navigator>
     );
   }
@@ -97,6 +60,11 @@ export default function RootNavigator() {
           name="AddTransaction"
           component={AddTransactionScreen}
           options={{ title: 'Add Transaction' }}
+        />
+        <Stack.Screen
+          name="AddRecipient"
+          component={AddRecipientScreen}
+          options={{ title: 'Add Recipient' }}
         />
       </Stack.Navigator>
     );

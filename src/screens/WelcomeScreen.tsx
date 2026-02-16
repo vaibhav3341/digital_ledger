@@ -1,21 +1,36 @@
 import React, { useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import Button from '../components/Button';
-import { signInWithGoogle } from '../services/auth';
+import Input from '../components/Input';
+import useSession from '../hooks/useSession';
+import { resolveSessionByPhone } from '../services/firestore';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 
 export default function WelcomeScreen() {
+  const { setSession } = useSession();
+  const [phoneLocalNumber, setPhoneLocalNumber] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleGoogleContinue = async () => {
+  const handlePhoneChange = (value: string) => {
+    setPhoneLocalNumber(value.replace(/\D+/g, ''));
+  };
+
+  const handleContinue = async () => {
     try {
       setLoading(true);
-      await signInWithGoogle();
+      const session = await resolveSessionByPhone(`+91 ${phoneLocalNumber}`.trim());
+      if (!session) {
+        Alert.alert(
+          'Phone number not registered',
+          'This phone number is not linked to any recipient. Ask admin to add you first.',
+        );
+        return;
+      }
+      setSession(session);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      Alert.alert('Google sign-in failed', message);
+      Alert.alert('Unable to continue', String(error));
     } finally {
       setLoading(false);
     }
@@ -25,11 +40,20 @@ export default function WelcomeScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Shared Ledger</Text>
       <Text style={styles.subtitle}>
-        Continue with Google to access your admin or coworker ledger.
+        Enter your phone number to continue.
       </Text>
+      <Input
+        label="Phone Number"
+        value={phoneLocalNumber}
+        placeholder="9876543210"
+        prefixText="+91"
+        keyboardType="phone-pad"
+        maxLength={10}
+        onChangeText={handlePhoneChange}
+      />
       <Button
-        label={loading ? 'Please wait...' : 'Continue with Google'}
-        onPress={handleGoogleContinue}
+        label={loading ? 'Please wait...' : 'Continue'}
+        onPress={handleContinue}
         disabled={loading}
       />
     </View>
