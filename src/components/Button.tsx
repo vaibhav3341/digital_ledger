@@ -1,7 +1,8 @@
 import React from 'react';
-import { Pressable, Text, StyleSheet, ViewStyle } from 'react-native';
+import { StyleProp, StyleSheet, ViewStyle } from 'react-native';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
+import AnimatedButton from './AnimatedButton';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
 
@@ -10,8 +11,15 @@ interface ButtonProps {
   onPress: () => void;
   disabled?: boolean;
   variant?: ButtonVariant;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
 }
+
+const modeMap = {
+  primary: 'contained',
+  secondary: 'outlined',
+  danger: 'contained',
+  ghost: 'text',
+} as const;
 
 export default function Button({
   label,
@@ -20,68 +28,54 @@ export default function Button({
   variant = 'primary',
   style,
 }: ButtonProps) {
+  const buttonColor =
+    variant === 'primary'
+      ? colors.primary
+      : variant === 'danger'
+        ? colors.danger
+        : undefined;
+
+  const textColor =
+    variant === 'primary' || variant === 'danger'
+      ? '#FFFFFF'
+      : variant === 'secondary'
+        ? colors.text
+        : colors.primary;
+
   return (
-    <Pressable
+    <AnimatedButton
+      mode={modeMap[variant]}
       onPress={onPress}
       disabled={disabled}
-      style={({ pressed }) => [
+      containerStyle={style}
+      buttonColor={buttonColor}
+      textColor={textColor}
+      labelStyle={styles.label}
+      contentStyle={styles.content}
+      style={[
         styles.base,
-        styles[variant],
-        pressed && !disabled ? styles.pressed : null,
-        disabled ? styles.disabled : null,
-        style,
+        variant === 'secondary' ? styles.secondary : null,
       ]}
     >
-      <Text style={[styles.label, styles[`label_${variant}`]]}>{label}</Text>
-    </Pressable>
+      {label}
+    </AnimatedButton>
   );
 }
 
 const styles = StyleSheet.create({
   base: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
     borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
   },
-  primary: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  secondary: {
-    backgroundColor: colors.card,
-    borderColor: colors.border,
-  },
-  danger: {
-    backgroundColor: colors.danger,
-    borderColor: colors.danger,
-  },
-  ghost: {
-    backgroundColor: 'transparent',
-    borderColor: 'transparent',
-  },
-  pressed: {
-    opacity: 0.8,
-  },
-  disabled: {
-    opacity: 0.5,
+  content: {
+    minHeight: 44,
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
   },
-  label_primary: {
-    color: '#FFFFFF',
-  },
-  label_secondary: {
-    color: colors.text,
-  },
-  label_danger: {
-    color: '#FFFFFF',
-  },
-  label_ghost: {
-    color: colors.primary,
+  secondary: {
+    backgroundColor: colors.card,
   },
 });

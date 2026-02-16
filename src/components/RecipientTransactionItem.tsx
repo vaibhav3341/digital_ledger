@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { Card } from 'react-native-paper';
 import { LedgerTransaction } from '../models/types';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
@@ -16,18 +17,20 @@ export default function RecipientTransactionItem({
   const txnDate = item.txnAt?.toDate?.();
 
   return (
-    <View style={styles.card}>
-      <View style={styles.row}>
-        <Text style={styles.type}>{isSent ? 'Sent' : 'Received'}</Text>
-        <Text style={[styles.amount, isSent ? styles.send : styles.receive]}>
-          {formatAmountFromCents(item.amountCents)}
+    <Card style={styles.card} mode="contained">
+      <View style={styles.content}>
+        <View style={styles.row}>
+          <Text style={styles.type}>{isSent ? 'Sent' : 'Received'}</Text>
+          <Text style={[styles.amount, isSent ? styles.send : styles.receive]}>
+            {formatAmountFromCents(item.amountCents)}
+          </Text>
+        </View>
+        <Text style={styles.date}>
+          {txnDate ? formatDate(txnDate) : 'Saving...'}
         </Text>
+        {item.note ? <Text style={styles.note}>{item.note}</Text> : null}
       </View>
-      <Text style={styles.date}>
-        {txnDate ? formatDate(txnDate) : 'Saving...'}
-      </Text>
-      {item.note ? <Text style={styles.note}>{item.note}</Text> : null}
-    </View>
+    </Card>
   );
 }
 
@@ -35,10 +38,12 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.card,
     borderRadius: 12,
-    padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
     marginBottom: spacing.md,
+  },
+  content: {
+    padding: spacing.lg,
   },
   row: {
     flexDirection: 'row',

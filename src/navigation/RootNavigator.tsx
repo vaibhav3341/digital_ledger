@@ -8,6 +8,7 @@ import RecipientLedgerScreen from '../screens/RecipientLedgerScreen';
 import CoworkerHomeScreen from '../screens/CoworkerHomeScreen';
 import AddTransactionScreen from '../screens/AddTransactionScreen';
 import AddRecipientScreen from '../screens/AddRecipientScreen';
+import { colors } from '../theme/colors';
 
 export type RootStackParamList = {
   Welcome: undefined;
@@ -27,6 +28,16 @@ export type RootStackParamList = {
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+const commonScreenOptions = {
+  headerStyle: {
+    backgroundColor: colors.card,
+  },
+  headerTintColor: colors.text,
+  headerShadowVisible: false,
+  contentStyle: {
+    backgroundColor: colors.background,
+  },
+};
 
 export default function RootNavigator() {
   const { session, loading } = useSession();
@@ -37,7 +48,7 @@ export default function RootNavigator() {
 
   if (!session) {
     return (
-      <Stack.Navigator>
+      <Stack.Navigator screenOptions={commonScreenOptions}>
         <Stack.Screen name="Welcome" component={WelcomeScreen} />
       </Stack.Navigator>
     );
@@ -45,7 +56,7 @@ export default function RootNavigator() {
 
   if (session.role === 'ADMIN') {
     return (
-      <Stack.Navigator>
+      <Stack.Navigator screenOptions={commonScreenOptions}>
         <Stack.Screen
           name="AdminHome"
           component={AdminHomeScreen}
@@ -71,7 +82,7 @@ export default function RootNavigator() {
   }
 
   return (
-    <Stack.Navigator>
+    <Stack.Navigator screenOptions={commonScreenOptions}>
       <Stack.Screen
         name="CoworkerHome"
         component={CoworkerHomeScreen}

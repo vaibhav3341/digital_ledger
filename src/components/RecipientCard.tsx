@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Chip } from 'react-native-paper';
 import { RecipientStatus } from '../models/types';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
@@ -27,12 +28,20 @@ export default function RecipientCard({
 }: RecipientCardProps) {
   const statusColor = status === 'JOINED' ? colors.primary : colors.muted;
   const netColor = netCents >= 0 ? colors.primary : colors.danger;
+  const statusChipBackground =
+    status === 'JOINED' ? colors.accent : '#EEF3FA';
 
   return (
     <Pressable onPress={onOpen} style={styles.card}>
       <View style={styles.row}>
         <Text style={styles.name}>{name}</Text>
-        <Text style={[styles.status, { color: statusColor }]}>{status}</Text>
+        <Chip
+          compact
+          style={[styles.statusChip, { backgroundColor: statusChipBackground }]}
+          textStyle={[styles.statusText, { color: statusColor }]}
+        >
+          {status}
+        </Chip>
       </View>
       <Text style={styles.phone}>{phoneNumber}</Text>
       <Text style={[styles.net, { color: netColor }]}>
@@ -76,8 +85,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text,
   },
-  status: {
-    fontSize: 12,
+  statusChip: {
+    minHeight: 26,
+  },
+  statusText: {
+    fontSize: 11,
     fontWeight: '700',
   },
   phone: {

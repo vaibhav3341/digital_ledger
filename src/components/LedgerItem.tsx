@@ -1,5 +1,6 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Card } from 'react-native-paper';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { Transaction } from '../models/types';
@@ -14,21 +15,28 @@ export default function LedgerItem({ item, onPress }: LedgerItemProps) {
   const isPaid = item.type === 'PAID_TO_COWORKER';
 
   return (
-    <Pressable style={styles.card} onPress={onPress}>
-      <View style={styles.row}>
-        <View>
-          <Text style={styles.type}>{isPaid ? 'Paid' : 'Received'}</Text>
-          <Text style={styles.date}>{formatDate(item.timestamp.toDate())}</Text>
+    <Card style={styles.card} mode="contained" onPress={onPress}>
+      <View style={styles.content}>
+        <View style={styles.row}>
+          <View>
+            <Text style={styles.type}>{isPaid ? 'Paid' : 'Received'}</Text>
+            <Text style={styles.date}>{formatDate(item.timestamp.toDate())}</Text>
+          </View>
+          <Text
+            style={[
+              styles.amount,
+              isPaid ? styles.amountPaid : styles.amountReceived,
+            ]}
+          >
+            {formatAmount(item.amount)}
+          </Text>
         </View>
-        <Text style={[styles.amount, isPaid ? styles.amountPaid : styles.amountReceived]}>
-          {formatAmount(item.amount)}
-        </Text>
+        {item.note ? <Text style={styles.note}>{item.note}</Text> : null}
+        {item.paymentMode ? (
+          <Text style={styles.meta}>Mode: {item.paymentMode}</Text>
+        ) : null}
       </View>
-      {item.note ? <Text style={styles.note}>{item.note}</Text> : null}
-      {item.paymentMode ? (
-        <Text style={styles.meta}>Mode: {item.paymentMode}</Text>
-      ) : null}
-    </Pressable>
+    </Card>
   );
 }
 
@@ -36,10 +44,12 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.card,
     borderRadius: 12,
-    padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
     marginBottom: spacing.md,
+  },
+  content: {
+    padding: spacing.lg,
   },
   row: {
     flexDirection: 'row',

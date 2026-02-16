@@ -12,23 +12,31 @@ import { createTransactionEntry } from '../services/firestore';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
+import { formatDateDDMMYYYY } from '../utils/format';
 
 function todayDateString() {
-  const date = new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return formatDateDDMMYYYY(new Date());
 }
 
 function parseDateInput(value: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value);
+  if (!match) {
     return null;
   }
-  const parsed = new Date(`${value}T12:00:00`);
-  if (Number.isNaN(parsed.getTime())) {
+
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  const parsed = new Date(year, month - 1, day, 12, 0, 0);
+  if (
+    Number.isNaN(parsed.getTime()) ||
+    parsed.getDate() !== day ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getFullYear() !== year
+  ) {
     return null;
   }
+
   return parsed;
 }
 
@@ -73,7 +81,7 @@ export default function AddTransactionScreen() {
 
     const parsedDate = parseDateInput(txnDate.trim());
     if (!parsedDate) {
-      Alert.alert('Enter date in YYYY-MM-DD format');
+      Alert.alert('Enter date in DD/MM/YYYY format');
       return;
     }
 
@@ -159,9 +167,9 @@ export default function AddTransactionScreen() {
         keyboardType="numeric"
       />
       <Input
-        label="Transaction Date (YYYY-MM-DD)"
+        label="Transaction Date (DD/MM/YYYY)"
         value={txnDate}
-        placeholder="2026-02-12"
+        placeholder="16/02/2026"
         onChangeText={setTxnDate}
       />
       <Input
