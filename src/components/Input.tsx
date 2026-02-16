@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, TextInput, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { TextInput as PaperTextInput } from 'react-native-paper';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 
@@ -26,33 +27,22 @@ export default function Input({
 }: InputProps) {
   return (
     <View style={styles.wrapper}>
-      {label ? <Text style={styles.label}>{label}</Text> : null}
-      {prefixText ? (
-        <View style={styles.prefixedInput}>
-          <Text style={styles.prefixText}>{prefixText}</Text>
-          <TextInput
-            style={styles.prefixedInputField}
-            value={value}
-            placeholder={placeholder}
-            placeholderTextColor={colors.muted}
-            onChangeText={onChangeText}
-            keyboardType={keyboardType}
-            secureTextEntry={secureTextEntry}
-            maxLength={maxLength}
-          />
-        </View>
-      ) : (
-        <TextInput
-          style={styles.input}
-          value={value}
-          placeholder={placeholder}
-          placeholderTextColor={colors.muted}
-          onChangeText={onChangeText}
-          keyboardType={keyboardType}
-          secureTextEntry={secureTextEntry}
-          maxLength={maxLength}
-        />
-      )}
+      <PaperTextInput
+        mode="outlined"
+        label={label}
+        value={value}
+        placeholder={placeholder}
+        placeholderTextColor={colors.muted}
+        onChangeText={onChangeText}
+        keyboardType={keyboardType}
+        secureTextEntry={secureTextEntry}
+        maxLength={maxLength}
+        style={styles.input}
+        outlineStyle={styles.outline}
+        left={
+          prefixText ? <PaperTextInput.Affix text={prefixText} /> : undefined
+        }
+      />
     </View>
   );
 }
@@ -61,39 +51,10 @@ const styles = StyleSheet.create({
   wrapper: {
     marginBottom: spacing.md,
   },
-  label: {
-    marginBottom: spacing.xs,
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: '600',
-  },
   input: {
     backgroundColor: colors.card,
+  },
+  outline: {
     borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    color: colors.text,
-  },
-  prefixedInput: {
-    backgroundColor: colors.card,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.md,
-    minHeight: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  prefixText: {
-    color: colors.text,
-    fontWeight: '600',
-    marginRight: spacing.sm,
-  },
-  prefixedInputField: {
-    flex: 1,
-    color: colors.text,
-    paddingVertical: spacing.sm,
   },
 });

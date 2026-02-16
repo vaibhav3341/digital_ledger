@@ -1,5 +1,6 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Card } from 'react-native-paper';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { formatAmount, formatDate } from '../utils/format';
@@ -18,15 +19,17 @@ export default function CoworkerCard({
   onPress,
 }: CoworkerCardProps) {
   return (
-    <Pressable onPress={onPress} style={styles.card}>
-      <View style={styles.row}>
-        <Text style={styles.name}>{name}</Text>
-        <Text style={styles.balance}>{formatAmount(balance)}</Text>
+    <Card onPress={onPress} style={styles.card} mode="contained">
+      <View style={styles.content}>
+        <View style={styles.row}>
+          <Text style={styles.name}>{name}</Text>
+          <Text style={styles.balance}>{formatAmount(balance)}</Text>
+        </View>
+        <Text style={styles.meta}>
+          Last entry: {lastActivity ? formatDate(lastActivity) : 'No entries'}
+        </Text>
       </View>
-      <Text style={styles.meta}>
-        Last entry: {lastActivity ? formatDate(lastActivity) : 'No entries'}
-      </Text>
-    </Pressable>
+    </Card>
   );
 }
 
@@ -34,10 +37,12 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.card,
     borderRadius: 12,
-    padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
     marginBottom: spacing.md,
+  },
+  content: {
+    padding: spacing.lg,
   },
   row: {
     flexDirection: 'row',
