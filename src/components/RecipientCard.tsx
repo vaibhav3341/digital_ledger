@@ -49,17 +49,21 @@ export default function RecipientCard({
       </Text>
       <View style={styles.actions}>
         <Button
-          label="Open"
-          variant="secondary"
-          onPress={onOpen}
+          label="Send"
+          onPress={(event) => {
+            event?.stopPropagation();
+            onSend();
+          }}
           style={styles.action}
         />
-        <Button label="Send" onPress={onSend} style={styles.action} />
         <Button
           label="Receive"
           variant="secondary"
-          onPress={onReceive}
-          style={styles.action}
+          onPress={(event) => {
+            event?.stopPropagation();
+            onReceive();
+          }}
+          style={styles.actionLast}
         />
       </View>
     </Pressable>
@@ -109,5 +113,8 @@ const styles = StyleSheet.create({
   action: {
     flex: 1,
     marginRight: spacing.sm,
+  },
+  actionLast: {
+    flex: 1,
   },
 });

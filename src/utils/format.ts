@@ -66,3 +66,26 @@ export function formatDateDDMMYYYY(dateLike: DateLike) {
 export function formatDate(dateLike: DateLike) {
   return formatDateDDMMYYYY(dateLike);
 }
+
+export function parseDateDDMMYYYY(value: string): Date | null {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value.trim());
+  if (!match) {
+    return null;
+  }
+
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  const parsed = new Date(year, month - 1, day, 12, 0, 0, 0);
+
+  if (
+    Number.isNaN(parsed.getTime()) ||
+    parsed.getDate() !== day ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getFullYear() !== year
+  ) {
+    return null;
+  }
+
+  return parsed;
+}
