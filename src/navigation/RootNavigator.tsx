@@ -8,6 +8,7 @@ import RecipientLedgerScreen from '../screens/RecipientLedgerScreen';
 import CoworkerHomeScreen from '../screens/CoworkerHomeScreen';
 import AddTransactionScreen from '../screens/AddTransactionScreen';
 import AddRecipientScreen from '../screens/AddRecipientScreen';
+import GetStatementScreen from '../screens/GetStatementScreen';
 import { colors } from '../theme/colors';
 
 export type RootStackParamList = {
@@ -24,6 +25,7 @@ export type RootStackParamList = {
     initialDirection?: 'SENT' | 'RECEIVED';
   };
   AddRecipient: undefined;
+  GetStatement: undefined;
   CoworkerHome: undefined;
 };
 
@@ -76,6 +78,11 @@ export default function RootNavigator() {
           name="AddRecipient"
           component={AddRecipientScreen}
           options={{ title: 'Add Recipient' }}
+        />
+        <Stack.Screen
+          name="GetStatement"
+          component={GetStatementScreen}
+          options={{ title: 'Get Statement' }}
         />
       </Stack.Navigator>
     );

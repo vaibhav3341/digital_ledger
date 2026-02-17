@@ -1,19 +1,26 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { Card } from 'react-native-paper';
-import { LedgerTransaction } from '../models/types';
-import { colors } from '../theme/colors';
-import { spacing } from '../theme/spacing';
-import { formatAmountFromCents, formatDate } from '../utils/format';
+import {StyleSheet, Text, View} from 'react-native';
+import {Card} from 'react-native-paper';
+import {LedgerTransaction} from '../models/types';
+import {colors} from '../theme/colors';
+import {spacing} from '../theme/spacing';
+import {formatAmountFromCents, formatDate} from '../utils/format';
+import {
+  directionForPerspective,
+  TransactionPerspective,
+} from '../utils/transactions';
 
 interface RecipientTransactionItemProps {
   item: LedgerTransaction;
+  perspective?: TransactionPerspective;
 }
 
 export default function RecipientTransactionItem({
   item,
+  perspective = 'ADMIN',
 }: RecipientTransactionItemProps) {
-  const isSent = item.direction === 'SENT';
+  const displayDirection = directionForPerspective(item.direction, perspective);
+  const isSent = displayDirection === 'SENT';
   const txnDate = item.txnAt?.toDate?.();
 
   return (

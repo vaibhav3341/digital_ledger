@@ -1,4 +1,4 @@
-import { LedgerTransaction } from '../models/types';
+import {LedgerTransaction, TransactionDirection} from '../models/types';
 
 export interface TransactionSummary {
   totalSentCents: number;
@@ -6,12 +6,43 @@ export interface TransactionSummary {
   netCents: number;
 }
 
+export type TransactionPerspective = 'ADMIN' | 'COWORKER';
+
 function emptySummary(): TransactionSummary {
   return {
     totalSentCents: 0,
     totalReceivedCents: 0,
     netCents: 0,
   };
+}
+
+export function invertDirection(
+  direction: TransactionDirection,
+): TransactionDirection {
+  return direction === 'SENT' ? 'RECEIVED' : 'SENT';
+}
+
+export function directionForPerspective(
+  direction: TransactionDirection,
+  perspective: TransactionPerspective,
+): TransactionDirection {
+  if (perspective === 'COWORKER') {
+    return invertDirection(direction);
+  }
+  return direction;
+}
+
+export function transactionsForPerspective(
+  transactions: LedgerTransaction[],
+  perspective: TransactionPerspective,
+): LedgerTransaction[] {
+  if (perspective === 'ADMIN') {
+    return transactions;
+  }
+  return transactions.map(transaction => ({
+    ...transaction,
+    direction: directionForPerspective(transaction.direction, perspective),
+  }));
 }
 
 export function summarizeTransactions(
@@ -29,11 +60,30 @@ export function summarizeTransactions(
   }, emptySummary());
 }
 
+export function summarizeTransactionsForPerspective(
+  transactions: LedgerTransaction[],
+  perspective: TransactionPerspective,
+): TransactionSummary {
+  if (perspective === 'ADMIN') {
+    return summarizeTransactions(transactions);
+  }
+
+  const perspectiveTransactions = transactionsForPerspective(
+    transactions,
+    perspective,
+  );
+  const summary = summarizeTransactions(perspectiveTransactions);
+  return {
+    ...summary,
+    netCents: summary.totalReceivedCents - summary.totalSentCents,
+  };
+}
+
 export function summarizeByRecipient(
   transactions: LedgerTransaction[],
 ): Record<string, TransactionSummary> {
   const summaryMap: Record<string, TransactionSummary> = {};
-  transactions.forEach((transaction) => {
+  transactions.forEach(transaction => {
     const current = summaryMap[transaction.recipientId] || emptySummary();
     if (transaction.direction === 'SENT') {
       current.totalSentCents += transaction.amountCents;

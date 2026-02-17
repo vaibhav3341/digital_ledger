@@ -1,5 +1,10 @@
 import React from 'react';
-import { StyleProp, StyleSheet, ViewStyle } from 'react-native';
+import {
+  GestureResponderEvent,
+  StyleProp,
+  StyleSheet,
+  ViewStyle,
+} from 'react-native';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import AnimatedButton from './AnimatedButton';
@@ -8,7 +13,7 @@ export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
 
 interface ButtonProps {
   label: string;
-  onPress: () => void;
+  onPress: (event?: GestureResponderEvent) => void;
   disabled?: boolean;
   variant?: ButtonVariant;
   style?: StyleProp<ViewStyle>;
