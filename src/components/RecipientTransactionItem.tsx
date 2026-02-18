@@ -17,8 +17,10 @@ export default function RecipientTransactionItem({
   item,
   onDelete,
   deleteDisabled,
+  perspective = 'ADMIN',
 }: RecipientTransactionItemProps) {
-  const isSent = item.direction === 'SENT';
+  const displayDirection = directionForPerspective(item.direction, perspective);
+  const isSent = displayDirection === 'SENT';
   const txnDate = item.txnAt?.toDate?.();
 
   return (

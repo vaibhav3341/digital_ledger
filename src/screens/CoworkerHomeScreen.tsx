@@ -1,26 +1,30 @@
 import React from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import {FlatList, StyleSheet, Text, View} from 'react-native';
 import Button from '../components/Button';
 import EmptyState from '../components/EmptyState';
 import RecipientTransactionItem from '../components/RecipientTransactionItem';
 import useRecipientTransactions from '../hooks/useRecipientTransactions';
 import useSession from '../hooks/useSession';
-import { colors } from '../theme/colors';
-import { spacing } from '../theme/spacing';
-import { typography } from '../theme/typography';
+import {colors} from '../theme/colors';
+import {spacing} from '../theme/spacing';
+import {typography} from '../theme/typography';
 import {
   formatAmountFromCents,
   formatSignedAmountFromCents,
 } from '../utils/format';
-import { summarizeTransactions } from '../utils/transactions';
+import {summarizeTransactionsForPerspective} from '../utils/transactions';
 
 export default function CoworkerHomeScreen() {
-  const { session, signOut } = useSession();
-  const recipientId = session?.role === 'COWORKER' ? session.recipientId : undefined;
+  const {session, signOut} = useSession();
+  const recipientId =
+    session?.role === 'COWORKER' ? session.recipientId : undefined;
   const recipientName =
     session?.role === 'COWORKER' ? session.recipientName : 'Recipient';
-  const { transactions } = useRecipientTransactions(recipientId);
-  const summary = summarizeTransactions(transactions);
+  const {transactions} = useRecipientTransactions(recipientId);
+  const summary = React.useMemo(
+    () => summarizeTransactionsForPerspective(transactions, 'COWORKER'),
+    [transactions],
+  );
   const [signingOut, setSigningOut] = React.useState(false);
 
   const handleSignOut = async () => {
@@ -63,8 +67,10 @@ export default function CoworkerHomeScreen() {
 
       <FlatList
         data={transactions}
-        keyExtractor={(item) => item.txnId}
-        renderItem={({ item }) => <RecipientTransactionItem item={item} />}
+        keyExtractor={item => item.txnId}
+        renderItem={({item}) => (
+          <RecipientTransactionItem item={item} perspective="COWORKER" />
+        )}
         ListEmptyComponent={
           <EmptyState
             title="No transactions"
@@ -72,7 +78,9 @@ export default function CoworkerHomeScreen() {
           />
         }
         contentContainerStyle={
-          transactions.length === 0 ? styles.emptyContainer : styles.listContainer
+          transactions.length === 0
+            ? styles.emptyContainer
+            : styles.listContainer
         }
       />
     </View>
