@@ -78,10 +78,35 @@ export default function AddRecipientScreen() {
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [showContactList, setShowContactList] = useState(false);
   const [contacts, setContacts] = useState<ContactCandidate[]>([]);
+  const [contactSearch, setContactSearch] = useState('');
 
   const canSave = useMemo(() => {
     return recipientName.trim().length > 0 && phoneLocalNumber.length >= 10;
   }, [recipientName, phoneLocalNumber]);
+
+  const filteredContacts = useMemo(() => {
+    const query = contactSearch.trim().toLowerCase();
+    if (!query) {
+      return contacts;
+    }
+
+    const queryDigits = query.replace(/\D+/g, '');
+    return contacts.filter((contact) => {
+      if (contact.name.toLowerCase().includes(query)) {
+        return true;
+      }
+
+      if (contact.phoneNumber.toLowerCase().includes(query)) {
+        return true;
+      }
+
+      if (!queryDigits) {
+        return false;
+      }
+
+      return contact.phoneNumber.replace(/\D+/g, '').includes(queryDigits);
+    });
+  }, [contactSearch, contacts]);
 
   const requestContactsPermission = async () => {
     if (Platform.OS !== 'android') {
@@ -103,13 +128,16 @@ export default function AddRecipientScreen() {
       }
 
       const allContacts = await Contacts.getAll();
-      const candidates = toContactCandidates(allContacts);
+      const candidates = toContactCandidates(allContacts).sort((a, b) =>
+        a.name.localeCompare(b.name),
+      );
       if (candidates.length === 0) {
         Alert.alert('No contacts with phone numbers found');
         return;
       }
 
       setContacts(candidates);
+      setContactSearch('');
       setShowContactList(true);
     } catch (error) {
       Alert.alert('Unable to load contacts', String(error));
@@ -121,6 +149,7 @@ export default function AddRecipientScreen() {
   const handlePickContact = (contact: ContactCandidate) => {
     setRecipientName(contact.name);
     setPhoneLocalNumber(toIndianLocalNumber(contact.phoneNumber));
+    setContactSearch('');
     setShowContactList(false);
   };
 
@@ -179,8 +208,14 @@ export default function AddRecipientScreen() {
               onPress={() => setShowContactList(false)}
             />
           </View>
+          <Input
+            label="Search Contacts"
+            value={contactSearch}
+            placeholder="Search by name or phone number"
+            onChangeText={setContactSearch}
+          />
           <FlatList
-            data={contacts}
+            data={filteredContacts}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <Button
@@ -190,6 +225,9 @@ export default function AddRecipientScreen() {
                 style={styles.contactRow}
               />
             )}
+            ListEmptyComponent={
+              <Text style={styles.contactEmpty}>No contacts found for this search.</Text>
+            }
             contentContainerStyle={styles.contactListContent}
           />
         </View>
@@ -244,7 +282,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.card,
-    maxHeight: 260,
+    maxHeight: 360,
     marginBottom: spacing.md,
     padding: spacing.md,
   },
@@ -263,5 +301,11 @@ const styles = StyleSheet.create({
   },
   contactRow: {
     marginBottom: spacing.xs,
+  },
+  contactEmpty: {
+    ...typography.body,
+    color: colors.muted,
+    textAlign: 'center',
+    paddingVertical: spacing.md,
   },
 });
