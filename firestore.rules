@@ -57,7 +57,7 @@ service cloud.firestore {
         && request.resource.data.recipientName == resource.data.recipientName
         && request.resource.data.status in ['INVITED', 'JOINED']
         && request.resource.data.createdAt == resource.data.createdAt;
-      allow delete: if false;
+      allow delete: if true;
     }
 
     match /recipientPhoneMappings/{phoneNormalized} {
@@ -70,7 +70,7 @@ service cloud.firestore {
       allow update: if request.resource.data.phoneNormalized == resource.data.phoneNormalized
         && request.resource.data.recipientId == resource.data.recipientId
         && request.resource.data.ledgerId == resource.data.ledgerId;
-      allow delete: if false;
+      allow delete: if true;
     }
 
     match /transactions/{txnId} {
@@ -84,7 +84,8 @@ service cloud.firestore {
         && nonEmptyString(request.resource.data.createdByUid)
         && request.resource.data.createdByRole == 'ADMIN'
         && validDirection(request.resource.data.direction);
-      allow update, delete: if false;
+      allow update: if false;
+      allow delete: if true;
     }
 
     match /recipientSummaries/{recipientId} {
@@ -94,7 +95,7 @@ service cloud.firestore {
         && request.resource.data.totalSentCents is int
         && request.resource.data.totalReceivedCents is int
         && request.resource.data.netCents is int;
-      allow delete: if false;
+      allow delete: if true;
     }
 
     match /ledgerSummaries/{ledgerId} {
@@ -102,7 +103,7 @@ service cloud.firestore {
       allow create, update: if request.resource.data.ledgerId == ledgerId
         && request.resource.data.totalSentCents is int
         && request.resource.data.totalReceivedCents is int;
-      allow delete: if false;
+      allow delete: if true;
     }
   }
 }

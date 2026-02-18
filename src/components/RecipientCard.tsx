@@ -15,6 +15,8 @@ interface RecipientCardProps {
   onOpen: () => void;
   onSend: () => void;
   onReceive: () => void;
+  onDelete?: () => void;
+  deleteDisabled?: boolean;
 }
 
 export default function RecipientCard({
@@ -25,6 +27,8 @@ export default function RecipientCard({
   onOpen,
   onSend,
   onReceive,
+  onDelete,
+  deleteDisabled,
 }: RecipientCardProps) {
   const statusColor = status === 'JOINED' ? colors.primary : colors.muted;
   const netColor = netCents >= 0 ? colors.primary : colors.danger;
@@ -62,6 +66,15 @@ export default function RecipientCard({
           style={styles.action}
         />
       </View>
+      {onDelete ? (
+        <Button
+          label={deleteDisabled ? 'Deleting...' : 'Delete Recipient'}
+          variant="danger"
+          onPress={onDelete}
+          disabled={deleteDisabled}
+          style={styles.deleteAction}
+        />
+      ) : null}
     </Pressable>
   );
 }
@@ -109,5 +122,8 @@ const styles = StyleSheet.create({
   action: {
     flex: 1,
     marginRight: spacing.sm,
+  },
+  deleteAction: {
+    marginTop: spacing.sm,
   },
 });

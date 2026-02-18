@@ -10,6 +10,10 @@ import useRecipients from '../hooks/useRecipients';
 import useSession from '../hooks/useSession';
 import useSharedTransactions from '../hooks/useSharedTransactions';
 import { RootStackParamList } from '../navigation/RootNavigator';
+import {
+  deleteRecipientEntry,
+  deleteTransactionEntry,
+} from '../services/firestore';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
@@ -24,6 +28,12 @@ export default function AdminHomeScreen() {
   const { recipients } = useRecipients(ledgerId);
   const [activeTab, setActiveTab] = useState<'MASTER' | 'RECIPIENTS'>('MASTER');
   const [signingOut, setSigningOut] = useState(false);
+  const [deletingTransactionId, setDeletingTransactionId] = useState<
+    string | null
+  >(null);
+  const [deletingRecipientId, setDeletingRecipientId] = useState<string | null>(
+    null,
+  );
 
   const summaryByRecipient = useMemo(
     () => summarizeByRecipient(transactions),
@@ -39,6 +49,68 @@ export default function AdminHomeScreen() {
     } finally {
       setSigningOut(false);
     }
+  };
+
+  const handleDeleteTransaction = (txnId: string, recipientName: string) => {
+    Alert.alert(
+      'Delete transaction',
+      `Delete this transaction for ${recipientName}?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                setDeletingTransactionId(txnId);
+                await deleteTransactionEntry({ txnId });
+              } catch (error) {
+                Alert.alert('Failed to delete transaction', String(error));
+              } finally {
+                setDeletingTransactionId((current) =>
+                  current === txnId ? null : current,
+                );
+              }
+            })();
+          },
+        },
+      ],
+    );
+  };
+
+  const handleDeleteRecipient = (recipientId: string, recipientName: string) => {
+    Alert.alert(
+      'Delete recipient',
+      `Delete ${recipientName}? This also removes all transactions for this recipient.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                setDeletingRecipientId(recipientId);
+                await deleteRecipientEntry({ recipientId });
+              } catch (error) {
+                Alert.alert('Failed to delete recipient', String(error));
+              } finally {
+                setDeletingRecipientId((current) =>
+                  current === recipientId ? null : current,
+                );
+              }
+            })();
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -83,7 +155,18 @@ export default function AdminHomeScreen() {
           <FlatList
             data={transactions}
             keyExtractor={(item) => item.txnId}
-            renderItem={({ item }) => <SharedTransactionItem item={item} />}
+            renderItem={({ item }) => (
+              <SharedTransactionItem
+                item={item}
+                onDelete={() =>
+                  handleDeleteTransaction(
+                    item.txnId,
+                    item.recipientNameSnapshot || 'recipient',
+                  )
+                }
+                deleteDisabled={deletingTransactionId === item.txnId}
+              />
+            )}
             ListEmptyComponent={
               <EmptyState
                 title="No transactions yet"
@@ -132,6 +215,10 @@ export default function AdminHomeScreen() {
                     initialDirection: 'RECEIVED',
                   })
                 }
+                onDelete={() =>
+                  handleDeleteRecipient(item.recipientId, item.recipientName)
+                }
+                deleteDisabled={deletingRecipientId === item.recipientId}
               />
             )}
             ListEmptyComponent={

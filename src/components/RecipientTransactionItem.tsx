@@ -5,13 +5,18 @@ import { LedgerTransaction } from '../models/types';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { formatAmountFromCents, formatDate } from '../utils/format';
+import Button from './Button';
 
 interface RecipientTransactionItemProps {
   item: LedgerTransaction;
+  onDelete?: () => void;
+  deleteDisabled?: boolean;
 }
 
 export default function RecipientTransactionItem({
   item,
+  onDelete,
+  deleteDisabled,
 }: RecipientTransactionItemProps) {
   const isSent = item.direction === 'SENT';
   const txnDate = item.txnAt?.toDate?.();
@@ -29,6 +34,15 @@ export default function RecipientTransactionItem({
           {txnDate ? formatDate(txnDate) : 'Saving...'}
         </Text>
         {item.note ? <Text style={styles.note}>{item.note}</Text> : null}
+        {onDelete ? (
+          <Button
+            label={deleteDisabled ? 'Deleting...' : 'Delete'}
+            variant="danger"
+            onPress={onDelete}
+            disabled={deleteDisabled}
+            style={styles.deleteAction}
+          />
+        ) : null}
       </View>
     </Card>
   );
@@ -74,5 +88,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     fontSize: 13,
     color: colors.text,
+  },
+  deleteAction: {
+    marginTop: spacing.md,
   },
 });
