@@ -1,14 +1,15 @@
-import React, {useMemo, useState} from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import {RouteProp, useNavigation, useRoute} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   ActivityIndicator,
   Card,
@@ -17,43 +18,98 @@ import {
   Modal,
   Portal,
   Searchbar,
-  TextInput as PaperTextInput,
 } from 'react-native-paper';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import useRecipients from '../hooks/useRecipients';
 import useSession from '../hooks/useSession';
-import {TransactionDirection} from '../models/types';
-import {RootStackParamList} from '../navigation/RootNavigator';
-import {createTransactionEntry} from '../services/firestore';
-import {colors} from '../theme/colors';
-import {spacing} from '../theme/spacing';
-import {typography} from '../theme/typography';
-import {formatDateDDMMYYYY, parseDateDDMMYYYY} from '../utils/format';
+import { TransactionDirection } from '../models/types';
+import { RootStackParamList } from '../navigation/RootNavigator';
+import { createTransactionEntry } from '../services/firestore';
+import { colors } from '../theme/colors';
+import { spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
+import { formatDateDDMMYYYY } from '../utils/format';
 
-function todayDateString() {
-  return formatDateDDMMYYYY(new Date());
+const monthNames = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function toNoonDate(date: Date) {
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    12,
+    0,
+    0,
+    0,
+  );
+}
+
+function todayDate() {
+  return toNoonDate(new Date());
+}
+
+function firstOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1, 12, 0, 0, 0);
+}
+
+function isSameDay(left: Date, right: Date) {
+  return (
+    left.getDate() === right.getDate() &&
+    left.getMonth() === right.getMonth() &&
+    left.getFullYear() === right.getFullYear()
+  );
+}
+
+function buildCalendarDays(monthDate: Date) {
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  const firstDay = new Date(year, month, 1, 12, 0, 0, 0);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const leadingGap = firstDay.getDay();
+  const cells: Array<Date | null> = [];
+
+  for (let index = 0; index < leadingGap; index += 1) {
+    cells.push(null);
+  }
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    cells.push(new Date(year, month, day, 12, 0, 0, 0));
+  }
+
+  while (cells.length % 7 !== 0) {
+    cells.push(null);
+  }
+
+  return cells;
 }
 
 function RecipientSeparator() {
   return <Divider />;
 }
 
-function formatTwoDigits(value: string) {
-  return value.padStart(2, '0');
-}
-
-function digitsOnly(value: string, maxLength: number) {
-  return value.replace(/\D/g, '').slice(0, maxLength);
-}
-
 export default function AddTransactionScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'AddTransaction'>>();
-  const {session} = useSession();
+  const { session } = useSession();
   const ledgerId = session?.role === 'ADMIN' ? session.ledgerId : undefined;
-  const {recipients, loading: recipientsLoading} = useRecipients(ledgerId);
+  const { recipients, loading: recipientsLoading } = useRecipients(ledgerId);
 
   const [selectedRecipientId, setSelectedRecipientId] = useState(
     route.params?.recipientId || '',
@@ -65,15 +121,11 @@ export default function AddTransactionScreen() {
   );
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
-  const [txnDate, setTxnDate] = useState(todayDateString());
+  const [txnDate, setTxnDate] = useState<Date>(todayDate);
   const [datePickerVisible, setDatePickerVisible] = useState(false);
-  const [draftDay, setDraftDay] = useState(
-    String(new Date().getDate()).padStart(2, '0'),
+  const [calendarMonthCursor, setCalendarMonthCursor] = useState<Date>(
+    firstOfMonth(todayDate()),
   );
-  const [draftMonth, setDraftMonth] = useState(
-    String(new Date().getMonth() + 1).padStart(2, '0'),
-  );
-  const [draftYear, setDraftYear] = useState(String(new Date().getFullYear()));
   const [loading, setLoading] = useState(false);
 
   const selectedRecipient = useMemo(
@@ -95,6 +147,18 @@ export default function AddTransactionScreen() {
       );
     });
   }, [recipientSearch, recipients]);
+  const yearOptions = useMemo(() => {
+    const firstYear = 1980;
+    const lastYear = new Date().getFullYear() + 20;
+    return Array.from(
+      { length: lastYear - firstYear + 1 },
+      (_, index) => firstYear + index,
+    );
+  }, []);
+  const calendarDays = useMemo(
+    () => buildCalendarDays(calendarMonthCursor),
+    [calendarMonthCursor],
+  );
 
   const openRecipientPicker = () => {
     setRecipientPickerVisible(true);
@@ -111,10 +175,7 @@ export default function AddTransactionScreen() {
   };
 
   const openDatePicker = () => {
-    const parsed = parseDateDDMMYYYY(txnDate.trim()) || new Date();
-    setDraftDay(String(parsed.getDate()).padStart(2, '0'));
-    setDraftMonth(String(parsed.getMonth() + 1).padStart(2, '0'));
-    setDraftYear(String(parsed.getFullYear()));
+    setCalendarMonthCursor(firstOfMonth(txnDate));
     setDatePickerVisible(true);
   };
 
@@ -123,25 +184,36 @@ export default function AddTransactionScreen() {
   };
 
   const handleSetToday = () => {
-    const today = new Date();
-    setTxnDate(formatDateDDMMYYYY(today));
-    setDraftDay(String(today.getDate()).padStart(2, '0'));
-    setDraftMonth(String(today.getMonth() + 1).padStart(2, '0'));
-    setDraftYear(String(today.getFullYear()));
+    const today = todayDate();
+    setTxnDate(today);
+    setCalendarMonthCursor(firstOfMonth(today));
     closeDatePicker();
   };
 
-  const handleApplyDate = () => {
-    const dateValue = `${formatTwoDigits(draftDay)}/${formatTwoDigits(
-      draftMonth,
-    )}/${draftYear}`;
-    const parsedDate = parseDateDDMMYYYY(dateValue);
-    if (!parsedDate) {
-      Alert.alert('Select a valid date');
-      return;
-    }
+  const updateCalendarMonth = (month: number) => {
+    setCalendarMonthCursor(current => {
+      const next = new Date(current);
+      next.setMonth(month, 1);
+      return firstOfMonth(next);
+    });
+  };
 
-    setTxnDate(formatDateDDMMYYYY(parsedDate));
+  const updateCalendarYear = (year: number) => {
+    setCalendarMonthCursor(current =>
+      firstOfMonth(new Date(year, current.getMonth(), 1)),
+    );
+  };
+
+  const stepCalendarMonth = (step: number) => {
+    setCalendarMonthCursor(current =>
+      firstOfMonth(new Date(current.getFullYear(), current.getMonth() + step, 1)),
+    );
+  };
+
+  const pickDate = (date: Date) => {
+    const selected = toNoonDate(date);
+    setTxnDate(selected);
+    setCalendarMonthCursor(firstOfMonth(selected));
     closeDatePicker();
   };
 
@@ -164,12 +236,6 @@ export default function AddTransactionScreen() {
       return;
     }
 
-    const parsedDate = parseDateDDMMYYYY(txnDate.trim());
-    if (!parsedDate) {
-      Alert.alert('Enter date in DD/MM/YYYY format');
-      return;
-    }
-
     try {
       setLoading(true);
       await createTransactionEntry({
@@ -178,13 +244,13 @@ export default function AddTransactionScreen() {
         direction,
         amountCents: Math.round(parsedAmount * 100),
         note: note.trim() || undefined,
-        txnAt: parsedDate,
+        txnAt: txnDate,
         createdByUid: session.uid,
         recipientNameSnapshot: selectedRecipient.recipientName,
       });
       navigation.goBack();
     } catch (error) {
-      const firestoreError = error as {code?: string; message?: string};
+      const firestoreError = error as { code?: string; message?: string };
       if (firestoreError?.code === 'firestore/permission-denied') {
         Alert.alert(
           'Failed to save transaction',
@@ -252,18 +318,20 @@ export default function AddTransactionScreen() {
           onChangeText={setAmount}
           keyboardType="numeric"
         />
-        <Input
-          label="Transaction Date"
-          value={txnDate}
-          placeholder="DD/MM/YYYY"
-          onChangeText={setTxnDate}
-        />
-        <Button
-          label="Pick Date"
-          variant="secondary"
-          onPress={openDatePicker}
-          style={styles.pickDateButton}
-        />
+
+        <View style={styles.dateFieldContainer}>
+          <Text style={styles.label}>Transaction Date</Text>
+          <Pressable
+            onPress={openDatePicker}
+            style={({ pressed }) => [
+              styles.dateField,
+              pressed ? styles.dateFieldPressed : null,
+            ]}>
+            <Text style={styles.dateValue}>{formatDateDDMMYYYY(txnDate)}</Text>
+            <Text style={styles.dateHint}>Tap to pick from calendar</Text>
+          </Pressable>
+        </View>
+
         <Input
           label="Note (optional)"
           value={note}
@@ -302,7 +370,7 @@ export default function AddTransactionScreen() {
               keyExtractor={item => item.recipientId}
               keyboardShouldPersistTaps="handled"
               style={styles.modalList}
-              renderItem={({item}) => (
+              renderItem={({ item }) => (
                 <List.Item
                   title={
                     selectedRecipientId === item.recipientId
@@ -337,49 +405,137 @@ export default function AddTransactionScreen() {
           visible={datePickerVisible}
           onDismiss={closeDatePicker}
           contentContainerStyle={styles.dateModalContainer}>
-          <Text style={styles.modalTitle}>Select date</Text>
-          <View style={styles.dateFieldsRow}>
-            <PaperTextInput
-              mode="outlined"
-              label="DD"
-              value={draftDay}
-              onChangeText={text => setDraftDay(digitsOnly(text, 2))}
-              keyboardType="number-pad"
-              maxLength={2}
-              style={[styles.dateFieldInput, styles.dateFieldSmall]}
-              outlineStyle={styles.dateFieldOutline}
-            />
-            <PaperTextInput
-              mode="outlined"
-              label="MM"
-              value={draftMonth}
-              onChangeText={text => setDraftMonth(digitsOnly(text, 2))}
-              keyboardType="number-pad"
-              maxLength={2}
-              style={[styles.dateFieldInput, styles.dateFieldSmall]}
-              outlineStyle={styles.dateFieldOutline}
-            />
-            <PaperTextInput
-              mode="outlined"
-              label="YYYY"
-              value={draftYear}
-              onChangeText={text => setDraftYear(digitsOnly(text, 4))}
-              keyboardType="number-pad"
-              maxLength={4}
-              style={[styles.dateFieldInput, styles.dateFieldLarge]}
-              outlineStyle={styles.dateFieldOutline}
-            />
-          </View>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}>
+            <Text style={styles.modalTitle}>Select date</Text>
 
-          <View style={styles.dateModalActions}>
-            <Button label="Cancel" variant="ghost" onPress={closeDatePicker} />
-            <Button
-              label="Today"
-              variant="secondary"
-              onPress={handleSetToday}
+            <View style={styles.monthHeader}>
+              <Pressable
+                onPress={() => stepCalendarMonth(-1)}
+                style={({ pressed }) => [
+                  styles.monthArrow,
+                  pressed ? styles.monthArrowPressed : null,
+                ]}>
+                <Text style={styles.monthArrowText}>{'<'}</Text>
+              </Pressable>
+              <Text style={styles.monthHeaderText}>
+                {monthNames[calendarMonthCursor.getMonth()]}{' '}
+                {calendarMonthCursor.getFullYear()}
+              </Text>
+              <Pressable
+                onPress={() => stepCalendarMonth(1)}
+                style={({ pressed }) => [
+                  styles.monthArrow,
+                  pressed ? styles.monthArrowPressed : null,
+                ]}>
+                <Text style={styles.monthArrowText}>{'>'}</Text>
+              </Pressable>
+            </View>
+
+            <Text style={styles.pickerLabel}>Month</Text>
+            <FlatList
+              horizontal
+              data={monthNames}
+              keyExtractor={item => item}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.pickerList}
+              renderItem={({ item, index }) => (
+                <Pressable
+                  onPress={() => updateCalendarMonth(index)}
+                  style={({ pressed }) => [
+                    styles.pickerChip,
+                    calendarMonthCursor.getMonth() === index
+                      ? styles.pickerChipActive
+                      : null,
+                    pressed ? styles.pickerChipPressed : null,
+                  ]}>
+                  <Text
+                    style={[
+                      styles.pickerChipText,
+                      calendarMonthCursor.getMonth() === index
+                        ? styles.pickerChipTextActive
+                        : null,
+                    ]}>
+                    {item.slice(0, 3)}
+                  </Text>
+                </Pressable>
+              )}
             />
-            <Button label="Apply" onPress={handleApplyDate} />
-          </View>
+
+            <Text style={styles.pickerLabel}>Year</Text>
+            <FlatList
+              horizontal
+              data={yearOptions}
+              keyExtractor={item => String(item)}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.pickerList}
+              renderItem={({ item }) => (
+                <Pressable
+                  onPress={() => updateCalendarYear(item)}
+                  style={({ pressed }) => [
+                    styles.pickerChip,
+                    calendarMonthCursor.getFullYear() === item
+                      ? styles.pickerChipActive
+                      : null,
+                    pressed ? styles.pickerChipPressed : null,
+                  ]}>
+                  <Text
+                    style={[
+                      styles.pickerChipText,
+                      calendarMonthCursor.getFullYear() === item
+                        ? styles.pickerChipTextActive
+                        : null,
+                    ]}>
+                    {item}
+                  </Text>
+                </Pressable>
+              )}
+            />
+
+            <View style={styles.weekdayRow}>
+              {weekdays.map(day => (
+                <View key={day} style={styles.weekdayCell}>
+                  <Text style={styles.weekdayText}>{day}</Text>
+                </View>
+              ))}
+            </View>
+
+            <View style={styles.calendarGrid}>
+              {calendarDays.map((dateCell, index) => {
+                if (!dateCell) {
+                  return <View key={`empty-${index}`} style={styles.dayCellWrap} />;
+                }
+
+                const isActive = isSameDay(dateCell, txnDate);
+                const key = `day-${dateCell.getFullYear()}-${dateCell.getMonth()}-${dateCell.getDate()}`;
+                return (
+                  <View key={key} style={styles.dayCellWrap}>
+                    <Pressable
+                      onPress={() => pickDate(dateCell)}
+                      style={({ pressed }) => [
+                        styles.dayCell,
+                        isActive ? styles.dayCellActive : null,
+                        pressed ? styles.dayCellPressed : null,
+                      ]}>
+                      <Text
+                        style={[
+                          styles.dayCellText,
+                          isActive ? styles.dayCellTextActive : null,
+                        ]}>
+                        {dateCell.getDate()}
+                      </Text>
+                    </Pressable>
+                  </View>
+                );
+              })}
+            </View>
+
+            <View style={styles.dateModalActions}>
+              <Button label="Close" variant="ghost" onPress={closeDatePicker} />
+              <Button label="Today" variant="secondary" onPress={handleSetToday} />
+            </View>
+          </ScrollView>
         </Modal>
       </Portal>
     </View>
@@ -437,9 +593,29 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: spacing.sm,
   },
-  pickDateButton: {
-    marginTop: -spacing.xs,
+  dateFieldContainer: {
     marginBottom: spacing.md,
+  },
+  dateField: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    backgroundColor: colors.card,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  dateFieldPressed: {
+    backgroundColor: colors.accent,
+  },
+  dateValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  dateHint: {
+    marginTop: spacing.xs,
+    fontSize: 12,
+    color: colors.muted,
   },
   modalContainer: {
     margin: spacing.lg,
@@ -497,25 +673,115 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.card,
+    maxHeight: '85%',
   },
-  dateFieldsRow: {
+  monthHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
   },
-  dateFieldInput: {
+  monthHeaderText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  monthArrow: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: colors.card,
+  },
+  monthArrowPressed: {
+    backgroundColor: colors.accent,
+  },
+  monthArrowText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  pickerLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.muted,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  pickerList: {
+    paddingBottom: spacing.sm,
+  },
+  pickerChip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 999,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     marginRight: spacing.sm,
+    backgroundColor: colors.card,
   },
-  dateFieldSmall: {
-    flex: 1,
+  pickerChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
-  dateFieldLarge: {
-    flex: 1.4,
-    marginRight: 0,
+  pickerChipPressed: {
+    opacity: 0.85,
   },
-  dateFieldOutline: {
-    borderRadius: 10,
+  pickerChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  pickerChipTextActive: {
+    color: '#FFFFFF',
+  },
+  weekdayRow: {
+    flexDirection: 'row',
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  weekdayCell: {
+    width: '14.285%',
+    alignItems: 'center',
+  },
+  weekdayText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.muted,
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: spacing.lg,
+  },
+  dayCellWrap: {
+    width: '14.285%',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  dayCell: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayCellActive: {
+    backgroundColor: colors.primary,
+  },
+  dayCellPressed: {
+    opacity: 0.8,
+  },
+  dayCellText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  dayCellTextActive: {
+    color: '#FFFFFF',
   },
   dateModalActions: {
     flexDirection: 'row',
