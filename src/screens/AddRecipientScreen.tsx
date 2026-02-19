@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Contacts from 'react-native-contacts';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -78,6 +79,7 @@ function toIndianLocalNumber(phoneNumber: string) {
 export default function AddRecipientScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { t } = useTranslation();
   const { session } = useSession();
   const ledgerId = session?.role === 'ADMIN' ? session.ledgerId : '';
 
@@ -134,7 +136,7 @@ export default function AddRecipientScreen() {
       setContactsLoading(true);
       const allowed = await requestContactsPermission();
       if (!allowed) {
-        Alert.alert('Contacts permission denied');
+        Alert.alert(t('recipient.permissionDenied'));
         return;
       }
 
@@ -147,7 +149,7 @@ export default function AddRecipientScreen() {
       setContactSearch('');
       setContactPickerVisible(true);
     } catch (error) {
-      Alert.alert('Unable to load contacts', String(error));
+      Alert.alert(t('recipient.unableToLoad'), String(error));
     } finally {
       setContactsLoading(false);
     }
@@ -166,11 +168,11 @@ export default function AddRecipientScreen() {
 
   const handleSave = async () => {
     if (!ledgerId) {
-      Alert.alert('Admin session is required');
+      Alert.alert(t('recipient.adminRequired'));
       return;
     }
     if (!canSave) {
-      Alert.alert('Enter name and valid phone number');
+      Alert.alert(t('recipient.enterValidDetails'));
       return;
     }
 
@@ -183,7 +185,7 @@ export default function AddRecipientScreen() {
       });
       navigation.goBack();
     } catch (error) {
-      Alert.alert('Failed to add recipient', String(error));
+      Alert.alert(t('recipient.failedToAdd'), String(error));
     } finally {
       setSubmitting(false);
     }
@@ -192,7 +194,7 @@ export default function AddRecipientScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.contentWrap}>
-        <Text style={styles.title}>Add Recipient</Text>
+        <Text style={styles.title}>{t('recipient.addTitle')}</Text>
 
         <View style={styles.modeRow}>
           <Chip
@@ -200,21 +202,25 @@ export default function AddRecipientScreen() {
             onPress={() => setMode('CONTACTS')}
             style={styles.modeChip}
           >
-            From Contacts
+            {t('recipient.fromContacts')}
           </Chip>
           <Chip
             selected={mode === 'MANUAL'}
             onPress={() => setMode('MANUAL')}
             style={styles.modeChip}
           >
-            Manual
+            {t('recipient.manual')}
           </Chip>
         </View>
 
         <View style={styles.formCard}>
           {mode === 'CONTACTS' ? (
             <Button
-              label={contactsLoading ? 'Loading contacts...' : 'Select from Contacts'}
+              label={
+                contactsLoading
+                  ? t('recipient.loadingContacts')
+                  : t('recipient.selectFromContacts')
+              }
               variant="secondary"
               onPress={loadContacts}
               disabled={contactsLoading || submitting}
@@ -223,15 +229,15 @@ export default function AddRecipientScreen() {
           ) : null}
 
           <Input
-            label="Recipient Name"
+            label={t('recipient.name')}
             value={recipientName}
-            placeholder="Enter recipient name"
+            placeholder={t('recipient.namePlaceholder')}
             onChangeText={setRecipientName}
           />
           <Input
-            label="Phone Number"
+            label={t('recipient.phone')}
             value={phoneLocalNumber}
-            placeholder="9876543210"
+            placeholder={t('recipient.phonePlaceholder')}
             prefixText="+91"
             keyboardType="phone-pad"
             maxLength={10}
@@ -243,7 +249,7 @@ export default function AddRecipientScreen() {
       <StickyActionBar
         actions={[
           {
-            label: submitting ? 'Saving...' : 'Add Recipient',
+            label: submitting ? t('recipient.saving') : t('recipient.addButton'),
             onPress: handleSave,
             disabled: submitting || !canSave,
             loading: submitting,
@@ -257,9 +263,9 @@ export default function AddRecipientScreen() {
           onDismiss={() => setContactPickerVisible(false)}
           contentContainerStyle={styles.modalContainer}
         >
-          <Text style={styles.modalTitle}>Select Contact</Text>
+          <Text style={styles.modalTitle}>{t('recipient.chooseContact')}</Text>
           <Searchbar
-            placeholder="Search name or phone"
+            placeholder={t('recipient.searchByNameOrPhone')}
             value={contactSearch}
             onChangeText={setContactSearch}
             style={styles.searchbar}
@@ -268,8 +274,8 @@ export default function AddRecipientScreen() {
           {contactsLoading ? (
             <FeedbackState
               variant="loading"
-              title="Loading contacts..."
-              subtitle="This may take a few seconds."
+              title={t('recipient.loadingContacts')}
+              subtitle={t('recipient.loadingContactsHint')}
             />
           ) : (
             <FlatList
@@ -287,13 +293,13 @@ export default function AddRecipientScreen() {
               ListEmptyComponent={
                 contacts.length === 0 ? (
                   <EmptyState
-                    title="No contacts with phone number"
-                    subtitle="Try manual mode to continue."
+                    title={t('recipient.noContactsFound')}
+                    subtitle={t('recipient.tryManualMode')}
                   />
                 ) : (
                   <EmptyState
-                    title="No matching contacts"
-                    subtitle="Try another search term."
+                    title={t('common.noResults')}
+                    subtitle={t('common.tryAgain')}
                   />
                 )
               }
@@ -306,7 +312,7 @@ export default function AddRecipientScreen() {
           )}
 
           <Button
-            label="Close"
+            label={t('common.close')}
             variant="ghost"
             onPress={() => setContactPickerVisible(false)}
             style={styles.modalClose}

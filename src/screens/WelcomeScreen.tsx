@@ -7,8 +7,10 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Button from '../components/Button';
 import Input from '../components/Input';
+import LanguageSelector from '../components/LanguageSelector';
 import StickyActionBar from '../components/StickyActionBar';
 import useSession from '../hooks/useSession';
 import { resolveSessionByPhone } from '../services/firestore';
@@ -21,6 +23,7 @@ import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 
 export default function WelcomeScreen() {
+  const { t } = useTranslation();
   const { setSession } = useSession();
   const [phoneLocalNumber, setPhoneLocalNumber] = useState('');
   const [suggestedPhone, setSuggestedPhone] = useState<string | null>(null);
@@ -64,7 +67,7 @@ export default function WelcomeScreen() {
 
   const handleContinue = async () => {
     if (!isValidPhone) {
-      setPhoneError('Enter a 10-digit phone number.');
+      setPhoneError(t('validation.invalidPhone'));
       return;
     }
 
@@ -73,13 +76,13 @@ export default function WelcomeScreen() {
       await saveLastLoginPhoneLocalNumber(phoneLocalNumber);
       const session = await resolveSessionByPhone(`+91 ${phoneLocalNumber}`.trim());
       if (!session) {
-        setPhoneError('Phone number not registered. Ask admin to add you.');
+        setPhoneError(t('welcome.phoneNotRegisteredMessage'));
         return;
       }
       setSuggestedPhone(phoneLocalNumber);
       setSession(session);
     } catch (error) {
-      Alert.alert('Unable to continue', String(error));
+      Alert.alert(t('welcome.unableToContinue'), String(error));
     } finally {
       setLoading(false);
     }
@@ -92,14 +95,16 @@ export default function WelcomeScreen() {
     >
       <View style={styles.content}>
         <View style={styles.brandBlock}>
-          <Text style={styles.brandTitle}>Shared Ledger</Text>
-          <Text style={styles.brandCaption}>Phone sign in</Text>
+          <Text style={styles.brandTitle}>{t('welcome.title')}</Text>
+          <Text style={styles.brandCaption}>{t('welcome.subtitle')}</Text>
         </View>
 
         <View style={styles.formCard}>
+          <LanguageSelector variant="secondary" style={styles.languageSelector} />
+
           {!loadingSuggestion && suggestedPhone && suggestedPhone !== phoneLocalNumber ? (
             <View style={styles.suggestionRow}>
-              <Text style={styles.suggestionText}>Use saved number</Text>
+              <Text style={styles.suggestionText}>{t('welcome.useSavedNumber')}</Text>
               <Button
                 label={suggestedPhone}
                 variant="secondary"
@@ -110,9 +115,9 @@ export default function WelcomeScreen() {
             </View>
           ) : null}
           <Input
-            label="Phone Number"
+            label={t('welcome.phoneLabel')}
             value={phoneLocalNumber}
-            placeholder="9876543210"
+            placeholder={t('welcome.phonePlaceholder')}
             prefixText="+91"
             keyboardType="phone-pad"
             maxLength={10}
@@ -125,7 +130,7 @@ export default function WelcomeScreen() {
       <StickyActionBar
         actions={[
           {
-            label: loading ? 'Checking...' : 'Continue',
+            label: loading ? t('welcome.pleaseWait') : t('welcome.continue'),
             onPress: handleContinue,
             disabled: loading || !isValidPhone,
             loading,
@@ -164,6 +169,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.lg,
+  },
+  languageSelector: {
+    marginBottom: spacing.md,
+    alignSelf: 'flex-start',
   },
   suggestionRow: {
     marginBottom: spacing.md,

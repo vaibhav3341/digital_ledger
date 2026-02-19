@@ -11,6 +11,7 @@ import {
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Modal, Portal, Searchbar } from 'react-native-paper';
+import { useTranslation } from 'react-i18next';
 import Button from '../components/Button';
 import EmptyState from '../components/EmptyState';
 import FeedbackState from '../components/FeedbackState';
@@ -94,6 +95,7 @@ function buildCalendarDays(monthDate: Date) {
 export default function AddTransactionScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { t } = useTranslation();
   const route = useRoute<RouteProp<RootStackParamList, 'AddTransaction'>>();
   const { session } = useSession();
   const ledgerId = session?.role === 'ADMIN' ? session.ledgerId : undefined;
@@ -147,15 +149,15 @@ export default function AddTransactionScreen() {
 
   const handleSave = async () => {
     if (!ledgerId || session?.role !== 'ADMIN') {
-      Alert.alert('Admin session required');
+      Alert.alert(t('transaction.adminRequired'));
       return;
     }
     if (!selectedRecipientId || !selectedRecipient) {
-      Alert.alert('Select recipient');
+      Alert.alert(t('transaction.selectRecipient'));
       return;
     }
     if (!amountCents) {
-      Alert.alert('Enter valid amount');
+      Alert.alert(t('transaction.enterValidAmount'));
       return;
     }
 
@@ -176,13 +178,13 @@ export default function AddTransactionScreen() {
       const firestoreError = error as { code?: string; message?: string };
       if (firestoreError?.code === 'firestore/permission-denied') {
         Alert.alert(
-          'Failed to save transaction',
-          'Firestore denied this write. Deploy latest firestore.rules and retry.',
+          t('transaction.failedToSave'),
+          t('transaction.permissionDenied'),
         );
         return;
       }
       Alert.alert(
-        'Failed to save transaction',
+        t('transaction.failedToSave'),
         firestoreError?.message || String(error),
       );
     } finally {
@@ -199,9 +201,9 @@ export default function AddTransactionScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.card}>
-          <Text style={styles.sectionLabel}>Recipient</Text>
+          <Text style={styles.sectionLabel}>{t('transaction.recipient')}</Text>
           <Button
-            label={selectedRecipient?.recipientName || 'Select recipient'}
+            label={selectedRecipient?.recipientName || t('transaction.selectRecipient')}
             variant="secondary"
             onPress={() => setRecipientPickerVisible(true)}
           />
@@ -210,26 +212,26 @@ export default function AddTransactionScreen() {
           ) : null}
           {recipients.length === 0 ? (
             <EmptyState
-              title="No recipients yet"
-              subtitle="Add a recipient before creating transactions."
-              actionLabel="Add recipient"
+              title={t('admin.noRecipients')}
+              subtitle={t('transaction.createRecipientFirst')}
+              actionLabel={t('recipient.addButton')}
               onActionPress={() => navigation.navigate('AddRecipient')}
             />
           ) : null}
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionLabel}>Direction</Text>
+          <Text style={styles.sectionLabel}>{t('transaction.directionLabel')}</Text>
           <View style={styles.directionRow}>
             <Button
-              label="Sent"
+              label={t('transaction.direction.sent')}
               size="compact"
               onPress={() => setDirection('SENT')}
               variant={direction === 'SENT' ? 'primary' : 'secondary'}
               style={styles.directionButton}
             />
             <Button
-              label="Received"
+              label={t('transaction.direction.received')}
               size="compact"
               onPress={() => setDirection('RECEIVED')}
               variant={direction === 'RECEIVED' ? 'primary' : 'secondary'}
@@ -238,16 +240,16 @@ export default function AddTransactionScreen() {
           </View>
 
           <Input
-            label="Amount"
+            label={t('transaction.amount')}
             value={amount}
-            placeholder="0.00"
+            placeholder={t('transaction.amountPlaceholder')}
             onChangeText={setAmount}
             keyboardType="numeric"
           />
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionLabel}>Date</Text>
+          <Text style={styles.sectionLabel}>{t('common.date')}</Text>
           <Pressable
             onPress={() => {
               setCalendarMonthCursor(firstOfMonth(txnDate));
@@ -259,45 +261,49 @@ export default function AddTransactionScreen() {
             ]}
           >
             <Text style={styles.dateValue}>{formatDateDDMMYYYY(txnDate)}</Text>
-            <Text style={styles.dateHint}>Tap to pick date</Text>
+            <Text style={styles.dateHint}>{t('transaction.tapToPick')}</Text>
           </Pressable>
         </View>
 
         <View style={styles.card}>
           {!showNote ? (
             <Button
-              label="Add optional note"
+              label={t('transaction.addOptionalNote')}
               variant="secondary"
               size="compact"
               onPress={() => setShowNote(true)}
             />
           ) : (
             <Input
-              label="Note (optional)"
+              label={t('transaction.noteOptional')}
               value={note}
-              placeholder="Description"
+              placeholder={t('transaction.descriptionPlaceholder')}
               onChangeText={setNote}
             />
           )}
         </View>
 
         <View style={styles.previewCard}>
-          <Text style={styles.sectionLabel}>Preview</Text>
+          <Text style={styles.sectionLabel}>{t('transaction.preview')}</Text>
           <Text style={styles.previewText}>
-            {selectedRecipient?.recipientName || 'No recipient selected'}
+            {selectedRecipient?.recipientName || t('transaction.noRecipientSelected')}
           </Text>
           <Text style={styles.previewText}>
-            {direction === 'SENT' ? 'Sent' : 'Received'}{' '}
+            {direction === 'SENT'
+              ? t('transaction.direction.sent')
+              : t('transaction.direction.received')}{' '}
             {amountCents ? formatAmountFromCents(amountCents) : formatAmountFromCents(0)}
           </Text>
-          <Text style={styles.previewMeta}>Date {formatDateDDMMYYYY(txnDate)}</Text>
+          <Text style={styles.previewMeta}>
+            {t('common.date')} {formatDateDDMMYYYY(txnDate)}
+          </Text>
         </View>
       </ScrollView>
 
       <StickyActionBar
         actions={[
           {
-            label: loading ? 'Saving...' : 'Save',
+            label: loading ? t('transaction.saving') : t('transaction.save'),
             onPress: handleSave,
             disabled: !canSave,
             loading,
@@ -311,9 +317,9 @@ export default function AddTransactionScreen() {
           onDismiss={() => setRecipientPickerVisible(false)}
           contentContainerStyle={styles.modalContainer}
         >
-          <Text style={styles.modalTitle}>Select recipient</Text>
+          <Text style={styles.modalTitle}>{t('transaction.selectRecipient')}</Text>
           <Searchbar
-            placeholder="Search by name or phone"
+            placeholder={t('recipient.searchByNameOrPhone')}
             value={recipientSearch}
             onChangeText={setRecipientSearch}
             style={styles.searchbar}
@@ -322,8 +328,8 @@ export default function AddTransactionScreen() {
           {recipientsLoading ? (
             <FeedbackState
               variant="loading"
-              title="Loading recipients..."
-              subtitle="Please wait a moment."
+              title={t('transaction.loadingRecipients')}
+              subtitle={t('transaction.loadingRecipientsHint')}
             />
           ) : (
             <FlatList
@@ -345,8 +351,8 @@ export default function AddTransactionScreen() {
               )}
               ListEmptyComponent={
                 <EmptyState
-                  title="No recipients found"
-                  subtitle="Try another search term."
+                  title={t('common.noResults')}
+                  subtitle={t('common.tryAgain')}
                 />
               }
               contentContainerStyle={
@@ -358,7 +364,7 @@ export default function AddTransactionScreen() {
           )}
 
           <Button
-            label="Close"
+            label={t('common.close')}
             variant="ghost"
             onPress={() => setRecipientPickerVisible(false)}
             style={styles.modalClose}
@@ -372,7 +378,7 @@ export default function AddTransactionScreen() {
           onDismiss={() => setDatePickerVisible(false)}
           contentContainerStyle={styles.modalContainer}
         >
-          <Text style={styles.modalTitle}>Select date</Text>
+          <Text style={styles.modalTitle}>{t('transaction.selectDate')}</Text>
 
           <View style={styles.monthHeader}>
             <Pressable
@@ -457,12 +463,12 @@ export default function AddTransactionScreen() {
 
           <View style={styles.dateActions}>
             <Button
-              label="Close"
+              label={t('common.close')}
               variant="ghost"
               onPress={() => setDatePickerVisible(false)}
             />
             <Button
-              label="Today"
+              label={t('common.today')}
               variant="secondary"
               onPress={() => {
                 const today = todayDate();

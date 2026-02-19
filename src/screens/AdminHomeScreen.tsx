@@ -3,6 +3,7 @@ import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Menu } from 'react-native-paper';
+import { useTranslation } from 'react-i18next';
 import Button from '../components/Button';
 import EmptyState from '../components/EmptyState';
 import FeedbackState from '../components/FeedbackState';
@@ -33,14 +34,6 @@ type MasterSortOrder = 'DESC' | 'ASC';
 type TabKey = 'LEDGER' | 'PEOPLE';
 
 const ALL_RECIPIENTS_FILTER = 'ALL';
-const viewOptions: SegmentedControlOption<TabKey>[] = [
-  { value: 'LEDGER', label: 'Ledger' },
-  { value: 'PEOPLE', label: 'People' },
-];
-const sortOptions: SegmentedControlOption<MasterSortOrder>[] = [
-  { value: 'DESC', label: 'Newest' },
-  { value: 'ASC', label: 'Oldest' },
-];
 
 function txnAtMillis(item: LedgerTransaction) {
   return item.txnAt?.toMillis?.() || 0;
@@ -49,6 +42,7 @@ function txnAtMillis(item: LedgerTransaction) {
 export default function AdminHomeScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { t } = useTranslation();
   const { session, signOut } = useSession();
   const ledgerId = session?.role === 'ADMIN' ? session.ledgerId : undefined;
   const { transactions, loading: transactionsLoading } =
@@ -71,6 +65,20 @@ export default function AdminHomeScreen() {
   const summaryByRecipient = useMemo(
     () => summarizeByRecipient(transactions),
     [transactions],
+  );
+  const viewOptions = useMemo<SegmentedControlOption<TabKey>[]>(
+    () => [
+      { value: 'LEDGER', label: t('admin.view.ledger') },
+      { value: 'PEOPLE', label: t('admin.view.people') },
+    ],
+    [t],
+  );
+  const sortOptions = useMemo<SegmentedControlOption<MasterSortOrder>[]>(
+    () => [
+      { value: 'DESC', label: t('admin.sortBy.newestFirst') },
+      { value: 'ASC', label: t('admin.sortBy.oldestFirst') },
+    ],
+    [t],
   );
 
   const recipientNameById = useMemo(() => {
@@ -129,15 +137,15 @@ export default function AdminHomeScreen() {
 
   const recipientFilterLabel =
     recipientFilterId === ALL_RECIPIENTS_FILTER
-      ? 'All people'
-      : recipientNameById[recipientFilterId] || 'Selected person';
+      ? t('admin.filterByRecipient')
+      : recipientNameById[recipientFilterId] || t('common.selectedRecipient');
 
   const handleSignOut = async () => {
     try {
       setSigningOut(true);
       await signOut();
     } catch (error) {
-      Alert.alert('Sign out failed', String(error));
+      Alert.alert(t('common.signOut'), String(error));
     } finally {
       setSigningOut(false);
     }
@@ -145,12 +153,12 @@ export default function AdminHomeScreen() {
 
   const handleDeleteTransaction = (txnId: string, recipientName: string) => {
     Alert.alert(
-      'Delete transaction',
-      `Delete this transaction for ${recipientName}?`,
+      t('admin.deleteTransaction'),
+      t('admin.deleteTransactionConfirm', { name: recipientName }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
             void (async () => {
@@ -158,7 +166,7 @@ export default function AdminHomeScreen() {
                 setDeletingTransactionId(txnId);
                 await deleteTransactionEntry({ txnId });
               } catch (error) {
-                Alert.alert('Failed to delete transaction', String(error));
+                Alert.alert(t('admin.failedToDelete'), String(error));
               } finally {
                 setDeletingTransactionId((current) =>
                   current === txnId ? null : current,
@@ -173,12 +181,12 @@ export default function AdminHomeScreen() {
 
   const handleDeleteRecipient = (recipientId: string, recipientName: string) => {
     Alert.alert(
-      'Delete recipient',
-      `Delete ${recipientName}? This also removes transactions for this recipient.`,
+      t('admin.deleteRecipient'),
+      t('admin.deleteRecipientConfirm', { name: recipientName }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
             void (async () => {
@@ -186,7 +194,7 @@ export default function AdminHomeScreen() {
                 setDeletingRecipientId(recipientId);
                 await deleteRecipientEntry({ recipientId });
               } catch (error) {
-                Alert.alert('Failed to delete recipient', String(error));
+                Alert.alert(t('admin.failedToDeleteRecipient'), String(error));
               } finally {
                 setDeletingRecipientId((current) =>
                   current === recipientId ? null : current,
@@ -204,20 +212,20 @@ export default function AdminHomeScreen() {
       <View style={styles.contentWrap}>
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.title}>Ledger</Text>
+            <Text style={styles.title}>{t('admin.title')}</Text>
             <Text style={styles.subtitle}>
               {session?.role === 'ADMIN' ? session.adminName : ''}
             </Text>
           </View>
           <OverflowMenu
-            triggerLabel="Actions"
+            triggerLabel={t('admin.actions')}
             items={[
               {
-                label: 'Get Statement',
+                label: t('admin.getStatement'),
                 onPress: () => navigation.navigate('GetStatement'),
               },
               {
-                label: signingOut ? 'Signing out...' : 'Sign Out',
+                label: signingOut ? t('common.signingOut') : t('common.signOut'),
                 onPress: handleSignOut,
                 disabled: signingOut,
               },
@@ -227,15 +235,15 @@ export default function AdminHomeScreen() {
 
         <View style={styles.summaryStrip}>
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>People</Text>
+            <Text style={styles.summaryLabel}>{t('admin.view.people')}</Text>
             <Text style={styles.summaryValue}>{recipients.length}</Text>
           </View>
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Entries</Text>
+            <Text style={styles.summaryLabel}>{t('admin.entries')}</Text>
             <Text style={styles.summaryValue}>{transactions.length}</Text>
           </View>
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Net</Text>
+            <Text style={styles.summaryLabel}>{t('common.net')}</Text>
             <Text style={styles.summaryValue}>
               {formatSignedAmountFromCents(ledgerSummary.netCents)}
             </Text>
@@ -243,7 +251,7 @@ export default function AdminHomeScreen() {
         </View>
 
         <View style={styles.controlGroup}>
-          <Text style={styles.controlLabel}>View</Text>
+          <Text style={styles.controlLabel}>{t('admin.view.label')}</Text>
           <SegmentedControl
             value={activeTab}
             options={viewOptions}
@@ -255,7 +263,7 @@ export default function AdminHomeScreen() {
         {activeTab === 'LEDGER' ? (
           <>
             <View style={styles.controlGroup}>
-              <Text style={styles.controlLabel}>Sort by date</Text>
+              <Text style={styles.controlLabel}>{t('admin.sortByDate')}</Text>
               <SegmentedControl
                 value={sortOrder}
                 options={sortOptions}
@@ -265,7 +273,7 @@ export default function AdminHomeScreen() {
             </View>
 
             <View style={styles.controlGroup}>
-              <Text style={styles.controlLabel}>Filter people</Text>
+              <Text style={styles.controlLabel}>{t('admin.filterPeople')}</Text>
               <View style={styles.filterActionsRow}>
                 <View style={styles.filterMenuWrap}>
                   <Menu
@@ -273,7 +281,7 @@ export default function AdminHomeScreen() {
                     onDismiss={() => setRecipientMenuVisible(false)}
                     anchor={
                       <FilterMenuButton
-                        label="People"
+                        label={t('admin.view.people')}
                         value={recipientFilterLabel}
                         onPress={() => setRecipientMenuVisible(true)}
                       />
@@ -284,7 +292,7 @@ export default function AdminHomeScreen() {
                         setRecipientFilterId(ALL_RECIPIENTS_FILTER);
                         setRecipientMenuVisible(false);
                       }}
-                      title="All people"
+                      title={t('admin.filterByRecipient')}
                     />
                     {recipients.length > 0 ? (
                       recipients.map((recipient) => (
@@ -298,12 +306,16 @@ export default function AdminHomeScreen() {
                         />
                       ))
                     ) : (
-                      <Menu.Item disabled onPress={() => {}} title="No people" />
+                      <Menu.Item
+                        disabled
+                        onPress={() => {}}
+                        title={t('admin.noRecipients')}
+                      />
                     )}
                   </Menu>
                 </View>
                 <Button
-                  label="All"
+                  label={t('common.all')}
                   variant="secondary"
                   size="compact"
                   onPress={() => setRecipientFilterId(ALL_RECIPIENTS_FILTER)}
@@ -320,8 +332,8 @@ export default function AdminHomeScreen() {
             transactionsLoading ? (
               <FeedbackState
                 variant="loading"
-                title="Loading ledger entries..."
-                subtitle="Pulling your latest transactions."
+                title={t('admin.loadingLedgerEntries')}
+                subtitle={t('admin.loadingLedgerEntriesHint')}
               />
             ) : (
               <FlatList
@@ -342,15 +354,15 @@ export default function AdminHomeScreen() {
                 ListEmptyComponent={
                   transactions.length === 0 ? (
                     <EmptyState
-                      title="No transactions yet"
-                      subtitle="Add the first transaction to start this ledger."
-                      actionLabel="Add transaction"
+                      title={t('admin.noTransactions')}
+                      subtitle={t('admin.addFirstTransaction')}
+                      actionLabel={t('admin.addTransaction')}
                       onActionPress={() => navigation.navigate('AddTransaction', {})}
                     />
                   ) : (
                     <EmptyState
-                      title="No matching transactions"
-                      subtitle="Adjust filters to see more results."
+                      title={t('admin.noMatchingTransactions')}
+                      subtitle={t('admin.changeFilters')}
                     />
                   )
                 }
@@ -365,8 +377,8 @@ export default function AdminHomeScreen() {
           ) : recipientsLoading ? (
             <FeedbackState
               variant="loading"
-              title="Loading people..."
-              subtitle="Pulling recipient list for this ledger."
+              title={t('admin.loadingRecipients')}
+              subtitle={t('admin.loadingRecipientsHint')}
             />
           ) : (
             <FlatList
@@ -406,9 +418,9 @@ export default function AdminHomeScreen() {
               )}
               ListEmptyComponent={
                 <EmptyState
-                  title="No people yet"
-                  subtitle="Add the first recipient to start tracking."
-                  actionLabel="Add recipient"
+                  title={t('admin.noRecipients')}
+                  subtitle={t('admin.addFirstRecipient')}
+                  actionLabel={t('recipient.addButton')}
                   onActionPress={() => navigation.navigate('AddRecipient')}
                 />
               }
@@ -424,7 +436,10 @@ export default function AdminHomeScreen() {
       <StickyActionBar
         actions={[
           {
-            label: activeTab === 'LEDGER' ? 'Add Transaction' : 'Add Recipient',
+            label:
+              activeTab === 'LEDGER'
+                ? t('admin.addTransaction')
+                : t('recipient.addButton'),
             onPress: () =>
               activeTab === 'LEDGER'
                 ? navigation.navigate('AddTransaction', {})
