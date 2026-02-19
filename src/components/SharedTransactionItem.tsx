@@ -4,6 +4,7 @@ import { Card } from 'react-native-paper';
 import { LedgerTransaction } from '../models/types';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
 import { formatAmountFromCents, formatDate } from '../utils/format';
 import Button from './Button';
 
@@ -19,26 +20,30 @@ export default function SharedTransactionItem({
   deleteDisabled,
 }: SharedTransactionItemProps) {
   const txnDate = item.txnAt?.toDate?.();
-  const directionLabel = item.direction === 'SENT' ? 'Sent' : 'Received';
-  const directionStyle =
-    item.direction === 'SENT' ? styles.directionSent : styles.directionReceived;
+  const amountColor = item.direction === 'SENT' ? colors.primary : colors.danger;
+  const signedAmount = `${item.direction === 'SENT' ? '+' : '-'}${formatAmountFromCents(
+    item.amountCents,
+  )}`;
 
   return (
     <Card style={styles.card} mode="contained">
       <View style={styles.content}>
         <View style={styles.row}>
           <Text style={styles.name}>{item.recipientNameSnapshot || 'Recipient'}</Text>
-          <Text style={styles.amount}>{formatAmountFromCents(item.amountCents)}</Text>
+          <Text style={[styles.amount, { color: amountColor }]}>{signedAmount}</Text>
         </View>
-        <Text style={[styles.direction, directionStyle]}>{directionLabel}</Text>
-        <Text style={styles.date}>
-          {txnDate ? formatDate(txnDate) : 'Saving...'}
-        </Text>
-        {item.note ? <Text style={styles.note}>{item.note}</Text> : null}
+
+        <Text style={styles.date}>{txnDate ? formatDate(txnDate) : 'Saving...'}</Text>
+        {item.note ? (
+          <Text style={styles.note} numberOfLines={1}>
+            {item.note}
+          </Text>
+        ) : null}
         {onDelete ? (
           <Button
             label={deleteDisabled ? 'Deleting...' : 'Delete'}
             variant="danger"
+            size="compact"
             onPress={onDelete}
             disabled={deleteDisabled}
             style={styles.deleteAction}
@@ -66,34 +71,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   name: {
-    fontSize: 14,
-    fontWeight: '700',
+    ...typography.bodyStrong,
     color: colors.text,
+    flex: 1,
+    marginRight: spacing.sm,
   },
   amount: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.primary,
+    ...typography.bodyStrong,
+    marginRight: spacing.xs,
   },
   date: {
+    ...typography.caption,
     marginTop: spacing.xs,
-    fontSize: 12,
     color: colors.muted,
   },
-  direction: {
-    marginTop: spacing.xs,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  directionSent: {
-    color: colors.primary,
-  },
-  directionReceived: {
-    color: colors.danger,
-  },
   note: {
-    marginTop: spacing.sm,
-    fontSize: 13,
+    ...typography.caption,
+    marginTop: spacing.xs,
     color: colors.text,
   },
   deleteAction: {

@@ -3,10 +3,12 @@ import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Chip, Menu } from 'react-native-paper';
-import Button from '../components/Button';
 import EmptyState from '../components/EmptyState';
+import FeedbackState from '../components/FeedbackState';
+import OverflowMenu from '../components/OverflowMenu';
 import RecipientCard from '../components/RecipientCard';
 import SharedTransactionItem from '../components/SharedTransactionItem';
+import StickyActionBar from '../components/StickyActionBar';
 import useRecipients from '../hooks/useRecipients';
 import useSession from '../hooks/useSession';
 import useSharedTransactions from '../hooks/useSharedTransactions';
@@ -19,15 +21,13 @@ import {
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
+import { formatSignedAmountFromCents } from '../utils/format';
 import { summarizeByRecipient } from '../utils/transactions';
 
 type MasterSortOrder = 'DESC' | 'ASC';
+type TabKey = 'LEDGER' | 'PEOPLE';
 
 const ALL_RECIPIENTS_FILTER = 'ALL';
-const sortLabelByOrder: Record<MasterSortOrder, string> = {
-  DESC: 'Date (Newest first)',
-  ASC: 'Date (Oldest first)',
-};
 
 function txnAtMillis(item: LedgerTransaction) {
   return item.txnAt?.toMillis?.() || 0;
@@ -38,20 +38,16 @@ export default function AdminHomeScreen() {
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { session, signOut } = useSession();
   const ledgerId = session?.role === 'ADMIN' ? session.ledgerId : undefined;
-  const { transactions } = useSharedTransactions(ledgerId);
-  const { recipients } = useRecipients(ledgerId);
-  const [activeTab, setActiveTab] = useState<'MASTER' | 'RECIPIENTS'>('MASTER');
+  const { transactions, loading: transactionsLoading } = useSharedTransactions(ledgerId);
+  const { recipients, loading: recipientsLoading } = useRecipients(ledgerId);
+
+  const [activeTab, setActiveTab] = useState<TabKey>('LEDGER');
   const [signingOut, setSigningOut] = useState(false);
-  const [deletingTransactionId, setDeletingTransactionId] = useState<
-    string | null
-  >(null);
-  const [deletingRecipientId, setDeletingRecipientId] = useState<string | null>(
-    null,
-  );
+  const [deletingTransactionId, setDeletingTransactionId] = useState<string | null>(null);
+  const [deletingRecipientId, setDeletingRecipientId] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<MasterSortOrder>('DESC');
   const [recipientFilterId, setRecipientFilterId] =
     useState<string>(ALL_RECIPIENTS_FILTER);
-  const [sortMenuVisible, setSortMenuVisible] = useState(false);
   const [recipientMenuVisible, setRecipientMenuVisible] = useState(false);
 
   const summaryByRecipient = useMemo(
@@ -66,6 +62,22 @@ export default function AdminHomeScreen() {
     });
     return map;
   }, [recipients]);
+
+  const ledgerSummary = useMemo(() => {
+    return transactions.reduce(
+      (acc, transaction) => {
+        if (transaction.direction === 'SENT') {
+          acc.totalSentCents += transaction.amountCents;
+          acc.netCents += transaction.amountCents;
+        } else {
+          acc.totalReceivedCents += transaction.amountCents;
+          acc.netCents -= transaction.amountCents;
+        }
+        return acc;
+      },
+      { totalSentCents: 0, totalReceivedCents: 0, netCents: 0 },
+    );
+  }, [transactions]);
 
   useEffect(() => {
     if (
@@ -99,8 +111,8 @@ export default function AdminHomeScreen() {
 
   const recipientFilterLabel =
     recipientFilterId === ALL_RECIPIENTS_FILTER
-      ? 'All recipients'
-      : recipientNameById[recipientFilterId] || 'Selected recipient';
+      ? 'All'
+      : recipientNameById[recipientFilterId] || 'Selected';
 
   const handleSignOut = async () => {
     try {
@@ -118,10 +130,7 @@ export default function AdminHomeScreen() {
       'Delete transaction',
       `Delete this transaction for ${recipientName}?`,
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
@@ -147,12 +156,9 @@ export default function AdminHomeScreen() {
   const handleDeleteRecipient = (recipientId: string, recipientName: string) => {
     Alert.alert(
       'Delete recipient',
-      `Delete ${recipientName}? This also removes all transactions for this recipient.`,
+      `Delete ${recipientName}? This also removes transactions for this recipient.`,
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
@@ -176,91 +182,85 @@ export default function AdminHomeScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.headerRow}>
-        <View>
-          <Text style={styles.title}>Admin Ledger</Text>
-          <Text style={styles.subtitle}>
-            {session?.role === 'ADMIN' ? session.adminName : ''}
-          </Text>
-        </View>
-        <View style={styles.headerActions}>
-          {activeTab === 'MASTER' ? (
-            <Button
-              label="Get Statement"
-              variant="secondary"
-              onPress={() => navigation.navigate('GetStatement')}
-              style={styles.headerActionButton}
-            />
-          ) : null}
-          <Button
-            label={signingOut ? 'Signing out...' : 'Sign Out'}
-            variant="ghost"
-            onPress={handleSignOut}
-            disabled={signingOut}
+    <View style={styles.screen}>
+      <View style={styles.contentWrap}>
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.title}>Ledger</Text>
+            <Text style={styles.subtitle}>
+              {session?.role === 'ADMIN' ? session.adminName : ''}
+            </Text>
+          </View>
+          <OverflowMenu
+            items={[
+              {
+                label: 'Get statement',
+                onPress: () => navigation.navigate('GetStatement'),
+              },
+              {
+                label: signingOut ? 'Signing out...' : 'Sign out',
+                onPress: handleSignOut,
+                disabled: signingOut,
+              },
+            ]}
           />
         </View>
-      </View>
 
-      <View style={styles.tabRow}>
-        <Button
-          label="Master Ledger"
-          onPress={() => setActiveTab('MASTER')}
-          variant={activeTab === 'MASTER' ? 'primary' : 'secondary'}
-          style={styles.tabButton}
-        />
-        <Button
-          label="Recipients"
-          onPress={() => setActiveTab('RECIPIENTS')}
-          variant={activeTab === 'RECIPIENTS' ? 'primary' : 'secondary'}
-          style={[styles.tabButton, styles.tabButtonLast]}
-        />
-      </View>
+        <View style={styles.summaryStrip}>
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>People</Text>
+            <Text style={styles.summaryValue}>{recipients.length}</Text>
+          </View>
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>Entries</Text>
+            <Text style={styles.summaryValue}>{transactions.length}</Text>
+          </View>
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>Net</Text>
+            <Text style={styles.summaryValue}>
+              {formatSignedAmountFromCents(ledgerSummary.netCents)}
+            </Text>
+          </View>
+        </View>
 
-      {activeTab === 'MASTER' ? (
-        <>
-          <Button
-            label="Add Transaction"
-            onPress={() => navigation.navigate('AddTransaction', {})}
-            style={styles.primaryAction}
-          />
+        <View style={styles.tabRow}>
+          <Chip
+            selected={activeTab === 'LEDGER'}
+            onPress={() => setActiveTab('LEDGER')}
+            style={styles.tabChip}
+          >
+            Ledger
+          </Chip>
+          <Chip
+            selected={activeTab === 'PEOPLE'}
+            onPress={() => setActiveTab('PEOPLE')}
+            style={styles.tabChip}
+          >
+            People
+          </Chip>
+        </View>
+
+        {activeTab === 'LEDGER' ? (
           <View style={styles.filterRow}>
-            <Menu
-              visible={sortMenuVisible}
-              onDismiss={() => setSortMenuVisible(false)}
-              anchor={
-                <Chip
-                  mode="flat"
-                  selected
-                  onPress={() => setSortMenuVisible(true)}
-                  style={styles.filterChip}
-                >
-                  {sortLabelByOrder[sortOrder]}
-                </Chip>
-              }
+            <Chip
+              selected={sortOrder === 'DESC'}
+              onPress={() => setSortOrder('DESC')}
+              style={styles.filterChip}
             >
-              <Menu.Item
-                onPress={() => {
-                  setSortOrder('DESC');
-                  setSortMenuVisible(false);
-                }}
-                title={sortLabelByOrder.DESC}
-              />
-              <Menu.Item
-                onPress={() => {
-                  setSortOrder('ASC');
-                  setSortMenuVisible(false);
-                }}
-                title={sortLabelByOrder.ASC}
-              />
-            </Menu>
-
+              Newest
+            </Chip>
+            <Chip
+              selected={sortOrder === 'ASC'}
+              onPress={() => setSortOrder('ASC')}
+              style={styles.filterChip}
+            >
+              Oldest
+            </Chip>
             <Menu
               visible={recipientMenuVisible}
               onDismiss={() => setRecipientMenuVisible(false)}
               anchor={
                 <Chip
-                  mode="flat"
                   selected
                   onPress={() => setRecipientMenuVisible(true)}
                   style={styles.filterChip}
@@ -274,7 +274,7 @@ export default function AdminHomeScreen() {
                   setRecipientFilterId(ALL_RECIPIENTS_FILTER);
                   setRecipientMenuVisible(false);
                 }}
-                title="All recipients"
+                title="All"
               />
               {recipients.length > 0 ? (
                 recipients.map((recipient) => (
@@ -288,126 +288,150 @@ export default function AdminHomeScreen() {
                   />
                 ))
               ) : (
-                <Menu.Item disabled onPress={() => {}} title="No recipients" />
+                <Menu.Item disabled onPress={() => {}} title="No people" />
               )}
             </Menu>
           </View>
-          <FlatList
-            data={filteredTransactions}
-            keyExtractor={(item) => item.txnId}
-            renderItem={({ item }) => (
-              <SharedTransactionItem
-                item={item}
-                onDelete={() =>
-                  handleDeleteTransaction(
-                    item.txnId,
-                    item.recipientNameSnapshot || 'recipient',
+        ) : null}
+
+        <View style={styles.listWrap}>
+          {activeTab === 'LEDGER' ? (
+            transactionsLoading ? (
+              <FeedbackState
+                variant="loading"
+                title="Loading ledger entries..."
+                subtitle="Pulling your latest transactions."
+              />
+            ) : (
+              <FlatList
+                data={filteredTransactions}
+                keyExtractor={(item) => item.txnId}
+                renderItem={({ item }) => (
+                  <SharedTransactionItem
+                    item={item}
+                    onDelete={() =>
+                      handleDeleteTransaction(
+                        item.txnId,
+                        item.recipientNameSnapshot || 'recipient',
+                      )
+                    }
+                    deleteDisabled={deletingTransactionId === item.txnId}
+                  />
+                )}
+                ListEmptyComponent={
+                  transactions.length === 0 ? (
+                    <EmptyState
+                      title="No transactions yet"
+                      subtitle="Add the first transaction to start this ledger."
+                      actionLabel="Add transaction"
+                      onActionPress={() => navigation.navigate('AddTransaction', {})}
+                    />
+                  ) : (
+                    <EmptyState
+                      title="No matching transactions"
+                      subtitle="Adjust filters to see more results."
+                    />
                   )
                 }
-                deleteDisabled={deletingTransactionId === item.txnId}
+                contentContainerStyle={
+                  filteredTransactions.length === 0
+                    ? styles.emptyContainer
+                    : styles.listContainer
+                }
+                showsVerticalScrollIndicator={false}
               />
-            )}
-            ListEmptyComponent={
-              <EmptyState
-                title={
-                  transactions.length === 0
-                    ? 'No transactions yet'
-                    : 'No matching transactions'
-                }
-                subtitle={
-                  transactions.length === 0
-                    ? 'Add the first recipient transaction.'
-                    : 'Change recipient or sort filters to see transactions.'
-                }
-              />
-            }
-            contentContainerStyle={
-              filteredTransactions.length === 0
-                ? styles.emptyContainer
-                : styles.listContainer
-            }
-          />
-        </>
-      ) : (
-        <>
-          <Button
-            label="Add Recipient"
-            onPress={() => navigation.navigate('AddRecipient')}
-            style={styles.primaryAction}
-          />
-          <FlatList
-            data={recipients}
-            keyExtractor={(item) => item.recipientId}
-            renderItem={({ item }) => (
-              <RecipientCard
-                name={item.recipientName}
-                phoneNumber={item.phoneNumber}
-                status={item.status}
-                netCents={summaryByRecipient[item.recipientId]?.netCents || 0}
-                onOpen={() =>
-                  navigation.navigate('RecipientLedger', {
-                    recipientId: item.recipientId,
-                    recipientName: item.recipientName,
-                    isReadOnly: false,
-                  })
-                }
-                onSend={() =>
-                  navigation.navigate('AddTransaction', {
-                    recipientId: item.recipientId,
-                    recipientName: item.recipientName,
-                    initialDirection: 'SENT',
-                  })
-                }
-                onReceive={() =>
-                  navigation.navigate('AddTransaction', {
-                    recipientId: item.recipientId,
-                    recipientName: item.recipientName,
-                    initialDirection: 'RECEIVED',
-                  })
-                }
-                onDelete={() =>
-                  handleDeleteRecipient(item.recipientId, item.recipientName)
-                }
-                deleteDisabled={deletingRecipientId === item.recipientId}
-              />
-            )}
-            ListEmptyComponent={
-              <EmptyState
-                title="No recipients"
-                subtitle="Add the first recipient with name and phone number."
-              />
-            }
-            contentContainerStyle={
-              recipients.length === 0 ? styles.emptyContainer : styles.listContainer
-            }
-          />
-        </>
-      )}
+            )
+          ) : recipientsLoading ? (
+            <FeedbackState
+              variant="loading"
+              title="Loading people..."
+              subtitle="Pulling recipient list for this ledger."
+            />
+          ) : (
+            <FlatList
+              data={recipients}
+              keyExtractor={(item) => item.recipientId}
+              renderItem={({ item }) => (
+                <RecipientCard
+                  name={item.recipientName}
+                  status={item.status}
+                  netCents={summaryByRecipient[item.recipientId]?.netCents || 0}
+                  onOpen={() =>
+                    navigation.navigate('RecipientLedger', {
+                      recipientId: item.recipientId,
+                      recipientName: item.recipientName,
+                      isReadOnly: false,
+                    })
+                  }
+                  onSend={() =>
+                    navigation.navigate('AddTransaction', {
+                      recipientId: item.recipientId,
+                      recipientName: item.recipientName,
+                      initialDirection: 'SENT',
+                    })
+                  }
+                  onReceive={() =>
+                    navigation.navigate('AddTransaction', {
+                      recipientId: item.recipientId,
+                      recipientName: item.recipientName,
+                      initialDirection: 'RECEIVED',
+                    })
+                  }
+                  onDelete={() =>
+                    handleDeleteRecipient(item.recipientId, item.recipientName)
+                  }
+                  deleteDisabled={deletingRecipientId === item.recipientId}
+                />
+              )}
+              ListEmptyComponent={
+                <EmptyState
+                  title="No people yet"
+                  subtitle="Add the first recipient to start tracking."
+                  actionLabel="Add recipient"
+                  onActionPress={() => navigation.navigate('AddRecipient')}
+                />
+              }
+              contentContainerStyle={
+                recipients.length === 0 ? styles.emptyContainer : styles.listContainer
+              }
+              showsVerticalScrollIndicator={false}
+            />
+          )}
+        </View>
+      </View>
+
+      <StickyActionBar
+        actions={[
+          {
+            label: activeTab === 'LEDGER' ? 'Add Transaction' : 'Add Recipient',
+            onPress: () =>
+              activeTab === 'LEDGER'
+                ? navigation.navigate('AddTransaction', {})
+                : navigation.navigate('AddRecipient'),
+          },
+        ]}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
     backgroundColor: colors.background,
-    padding: spacing.lg,
+  },
+  contentWrap: {
+    flex: 1,
+    paddingHorizontal: spacing.screenHorizontal,
+    paddingTop: spacing.lg,
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: spacing.md,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerActionButton: {
-    marginRight: spacing.sm,
   },
   title: {
-    ...typography.title,
+    ...typography.heading,
     color: colors.text,
   },
   subtitle: {
@@ -415,32 +439,56 @@ const styles = StyleSheet.create({
     color: colors.muted,
     marginTop: spacing.xs,
   },
-  tabRow: {
+  summaryStrip: {
+    marginTop: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    backgroundColor: colors.card,
     flexDirection: 'row',
-    marginBottom: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xs,
   },
-  tabButton: {
+  summaryItem: {
     flex: 1,
+    alignItems: 'center',
+  },
+  summaryLabel: {
+    ...typography.caption,
+    color: colors.muted,
+  },
+  summaryValue: {
+    ...typography.bodyStrong,
+    color: colors.text,
+    marginTop: spacing.xxs,
+  },
+  tabRow: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+  },
+  tabChip: {
     marginRight: spacing.sm,
-  },
-  tabButtonLast: {
-    marginRight: 0,
-  },
-  primaryAction: {
-    marginBottom: spacing.md,
+    backgroundColor: colors.chip,
   },
   filterRow: {
+    marginTop: spacing.md,
     flexDirection: 'row',
-    marginBottom: spacing.md,
+    flexWrap: 'wrap',
   },
   filterChip: {
     marginRight: spacing.sm,
-    backgroundColor: colors.accent,
+    marginBottom: spacing.xs,
+    backgroundColor: colors.chip,
+  },
+  listWrap: {
+    flex: 1,
+    marginTop: spacing.sm,
   },
   listContainer: {
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.lg,
   },
   emptyContainer: {
     flexGrow: 1,
+    justifyContent: 'center',
   },
 });
