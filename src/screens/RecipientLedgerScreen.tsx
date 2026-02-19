@@ -1,5 +1,5 @@
-import React from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Button from '../components/Button';
@@ -7,6 +7,7 @@ import EmptyState from '../components/EmptyState';
 import RecipientTransactionItem from '../components/RecipientTransactionItem';
 import useRecipientTransactions from '../hooks/useRecipientTransactions';
 import { RootStackParamList } from '../navigation/RootNavigator';
+import { deleteTransactionEntry } from '../services/firestore';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
@@ -23,6 +24,32 @@ export default function RecipientLedgerScreen() {
   const { recipientId, recipientName, isReadOnly } = route.params;
   const { transactions } = useRecipientTransactions(recipientId);
   const summary = summarizeTransactions(transactions);
+  const [deletingTxnId, setDeletingTxnId] = useState<string | null>(null);
+
+  const handleDeleteTransaction = (txnId: string) => {
+    Alert.alert('Delete transaction', 'Delete this recipient transaction?', [
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            try {
+              setDeletingTxnId(txnId);
+              await deleteTransactionEntry({ txnId });
+            } catch (error) {
+              Alert.alert('Failed to delete transaction', String(error));
+            } finally {
+              setDeletingTxnId((current) => (current === txnId ? null : current));
+            }
+          })();
+        },
+      },
+    ]);
+  };
 
   return (
     <View style={styles.container}>
@@ -71,7 +98,15 @@ export default function RecipientLedgerScreen() {
       <FlatList
         data={transactions}
         keyExtractor={(item) => item.txnId}
-        renderItem={({ item }) => <RecipientTransactionItem item={item} />}
+        renderItem={({ item }) => (
+          <RecipientTransactionItem
+            item={item}
+            onDelete={
+              !isReadOnly ? () => handleDeleteTransaction(item.txnId) : undefined
+            }
+            deleteDisabled={deletingTxnId === item.txnId}
+          />
+        )}
         ListEmptyComponent={
           <EmptyState
             title="No recipient transactions"

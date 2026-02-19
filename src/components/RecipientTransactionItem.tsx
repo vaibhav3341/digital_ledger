@@ -1,22 +1,22 @@
 import React from 'react';
-import {StyleSheet, Text, View} from 'react-native';
-import {Card} from 'react-native-paper';
-import {LedgerTransaction} from '../models/types';
-import {colors} from '../theme/colors';
-import {spacing} from '../theme/spacing';
-import {formatAmountFromCents, formatDate} from '../utils/format';
-import {
-  directionForPerspective,
-  TransactionPerspective,
-} from '../utils/transactions';
+import { StyleSheet, Text, View } from 'react-native';
+import { Card } from 'react-native-paper';
+import { LedgerTransaction } from '../models/types';
+import { colors } from '../theme/colors';
+import { spacing } from '../theme/spacing';
+import { formatAmountFromCents, formatDate } from '../utils/format';
+import Button from './Button';
 
 interface RecipientTransactionItemProps {
   item: LedgerTransaction;
-  perspective?: TransactionPerspective;
+  onDelete?: () => void;
+  deleteDisabled?: boolean;
 }
 
 export default function RecipientTransactionItem({
   item,
+  onDelete,
+  deleteDisabled,
   perspective = 'ADMIN',
 }: RecipientTransactionItemProps) {
   const displayDirection = directionForPerspective(item.direction, perspective);
@@ -36,6 +36,15 @@ export default function RecipientTransactionItem({
           {txnDate ? formatDate(txnDate) : 'Saving...'}
         </Text>
         {item.note ? <Text style={styles.note}>{item.note}</Text> : null}
+        {onDelete ? (
+          <Button
+            label={deleteDisabled ? 'Deleting...' : 'Delete'}
+            variant="danger"
+            onPress={onDelete}
+            disabled={deleteDisabled}
+            style={styles.deleteAction}
+          />
+        ) : null}
       </View>
     </Card>
   );
@@ -81,5 +90,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     fontSize: 13,
     color: colors.text,
+  },
+  deleteAction: {
+    marginTop: spacing.md,
   },
 });
