@@ -2,10 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Chip, Menu } from 'react-native-paper';
+import { Menu } from 'react-native-paper';
 import Button from '../components/Button';
 import EmptyState from '../components/EmptyState';
+import FilterMenuButton from '../components/FilterMenuButton';
 import RecipientCard from '../components/RecipientCard';
+import SegmentedControl, {
+  SegmentedControlOption,
+} from '../components/SegmentedControl';
 import SharedTransactionItem from '../components/SharedTransactionItem';
 import useRecipients from '../hooks/useRecipients';
 import useSession from '../hooks/useSession';
@@ -22,12 +26,17 @@ import { typography } from '../theme/typography';
 import { summarizeByRecipient } from '../utils/transactions';
 
 type MasterSortOrder = 'DESC' | 'ASC';
+type ActiveTab = 'MASTER' | 'RECIPIENTS';
 
 const ALL_RECIPIENTS_FILTER = 'ALL';
-const sortLabelByOrder: Record<MasterSortOrder, string> = {
-  DESC: 'Date (Newest first)',
-  ASC: 'Date (Oldest first)',
-};
+const viewOptions: SegmentedControlOption<ActiveTab>[] = [
+  { value: 'MASTER', label: 'Ledger' },
+  { value: 'RECIPIENTS', label: 'People' },
+];
+const sortOptions: SegmentedControlOption<MasterSortOrder>[] = [
+  { value: 'DESC', label: 'Newest' },
+  { value: 'ASC', label: 'Oldest' },
+];
 
 function txnAtMillis(item: LedgerTransaction) {
   return item.txnAt?.toMillis?.() || 0;
@@ -40,7 +49,7 @@ export default function AdminHomeScreen() {
   const ledgerId = session?.role === 'ADMIN' ? session.ledgerId : undefined;
   const { transactions } = useSharedTransactions(ledgerId);
   const { recipients } = useRecipients(ledgerId);
-  const [activeTab, setActiveTab] = useState<'MASTER' | 'RECIPIENTS'>('MASTER');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('MASTER');
   const [signingOut, setSigningOut] = useState(false);
   const [deletingTransactionId, setDeletingTransactionId] = useState<
     string | null
@@ -51,7 +60,6 @@ export default function AdminHomeScreen() {
   const [sortOrder, setSortOrder] = useState<MasterSortOrder>('DESC');
   const [recipientFilterId, setRecipientFilterId] =
     useState<string>(ALL_RECIPIENTS_FILTER);
-  const [sortMenuVisible, setSortMenuVisible] = useState(false);
   const [recipientMenuVisible, setRecipientMenuVisible] = useState(false);
 
   const summaryByRecipient = useMemo(
@@ -179,7 +187,7 @@ export default function AdminHomeScreen() {
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <View>
-          <Text style={styles.title}>Admin Ledger</Text>
+          <Text style={styles.title}>Ledger</Text>
           <Text style={styles.subtitle}>
             {session?.role === 'ADMIN' ? session.adminName : ''}
           </Text>
@@ -195,25 +203,20 @@ export default function AdminHomeScreen() {
           ) : null}
           <Button
             label={signingOut ? 'Signing out...' : 'Sign Out'}
-            variant="ghost"
+            variant="secondary"
             onPress={handleSignOut}
             disabled={signingOut}
           />
         </View>
       </View>
 
-      <View style={styles.tabRow}>
-        <Button
-          label="Master Ledger"
-          onPress={() => setActiveTab('MASTER')}
-          variant={activeTab === 'MASTER' ? 'primary' : 'secondary'}
-          style={styles.tabButton}
-        />
-        <Button
-          label="Recipients"
-          onPress={() => setActiveTab('RECIPIENTS')}
-          variant={activeTab === 'RECIPIENTS' ? 'primary' : 'secondary'}
-          style={[styles.tabButton, styles.tabButtonLast]}
+      <View style={styles.controlGroup}>
+        <Text style={styles.controlLabel}>View</Text>
+        <SegmentedControl
+          value={activeTab}
+          options={viewOptions}
+          onChange={setActiveTab}
+          equalWidth
         />
       </View>
 
@@ -224,73 +227,62 @@ export default function AdminHomeScreen() {
             onPress={() => navigation.navigate('AddTransaction', {})}
             style={styles.primaryAction}
           />
-          <View style={styles.filterRow}>
-            <Menu
-              visible={sortMenuVisible}
-              onDismiss={() => setSortMenuVisible(false)}
-              anchor={
-                <Chip
-                  mode="flat"
-                  selected
-                  onPress={() => setSortMenuVisible(true)}
-                  style={styles.filterChip}
-                >
-                  {sortLabelByOrder[sortOrder]}
-                </Chip>
-              }
-            >
-              <Menu.Item
-                onPress={() => {
-                  setSortOrder('DESC');
-                  setSortMenuVisible(false);
-                }}
-                title={sortLabelByOrder.DESC}
-              />
-              <Menu.Item
-                onPress={() => {
-                  setSortOrder('ASC');
-                  setSortMenuVisible(false);
-                }}
-                title={sortLabelByOrder.ASC}
-              />
-            </Menu>
+          <View style={styles.controlGroup}>
+            <Text style={styles.controlLabel}>Sort by date</Text>
+            <SegmentedControl
+              value={sortOrder}
+              options={sortOptions}
+              onChange={setSortOrder}
+              equalWidth
+            />
+          </View>
 
-            <Menu
-              visible={recipientMenuVisible}
-              onDismiss={() => setRecipientMenuVisible(false)}
-              anchor={
-                <Chip
-                  mode="flat"
-                  selected
-                  onPress={() => setRecipientMenuVisible(true)}
-                  style={styles.filterChip}
+          <View style={styles.controlGroup}>
+            <Text style={styles.controlLabel}>Filter people</Text>
+            <View style={styles.filterActionsRow}>
+              <View style={styles.filterMenuWrap}>
+                <Menu
+                  visible={recipientMenuVisible}
+                  onDismiss={() => setRecipientMenuVisible(false)}
+                  anchor={
+                    <FilterMenuButton
+                      label="People"
+                      value={recipientFilterLabel}
+                      onPress={() => setRecipientMenuVisible(true)}
+                    />
+                  }
                 >
-                  {recipientFilterLabel}
-                </Chip>
-              }
-            >
-              <Menu.Item
-                onPress={() => {
-                  setRecipientFilterId(ALL_RECIPIENTS_FILTER);
-                  setRecipientMenuVisible(false);
-                }}
-                title="All recipients"
-              />
-              {recipients.length > 0 ? (
-                recipients.map((recipient) => (
                   <Menu.Item
-                    key={recipient.recipientId}
                     onPress={() => {
-                      setRecipientFilterId(recipient.recipientId);
+                      setRecipientFilterId(ALL_RECIPIENTS_FILTER);
                       setRecipientMenuVisible(false);
                     }}
-                    title={recipient.recipientName}
+                    title="All people"
                   />
-                ))
-              ) : (
-                <Menu.Item disabled onPress={() => {}} title="No recipients" />
-              )}
-            </Menu>
+                  {recipients.length > 0 ? (
+                    recipients.map((recipient) => (
+                      <Menu.Item
+                        key={recipient.recipientId}
+                        onPress={() => {
+                          setRecipientFilterId(recipient.recipientId);
+                          setRecipientMenuVisible(false);
+                        }}
+                        title={recipient.recipientName}
+                      />
+                    ))
+                  ) : (
+                    <Menu.Item disabled onPress={() => {}} title="No recipients" />
+                  )}
+                </Menu>
+              </View>
+              <Button
+                label="All"
+                variant="secondary"
+                onPress={() => setRecipientFilterId(ALL_RECIPIENTS_FILTER)}
+                disabled={recipientFilterId === ALL_RECIPIENTS_FILTER}
+                style={styles.allFilterButton}
+              />
+            </View>
           </View>
           <FlatList
             data={filteredTransactions}
@@ -415,27 +407,28 @@ const styles = StyleSheet.create({
     color: colors.muted,
     marginTop: spacing.xs,
   },
-  tabRow: {
-    flexDirection: 'row',
+  controlGroup: {
     marginBottom: spacing.md,
   },
-  tabButton: {
-    flex: 1,
-    marginRight: spacing.sm,
-  },
-  tabButtonLast: {
-    marginRight: 0,
+  controlLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.muted,
+    marginBottom: spacing.xs,
   },
   primaryAction: {
     marginBottom: spacing.md,
   },
-  filterRow: {
+  filterActionsRow: {
     flexDirection: 'row',
-    marginBottom: spacing.md,
+    alignItems: 'center',
   },
-  filterChip: {
+  filterMenuWrap: {
+    flex: 1,
     marginRight: spacing.sm,
-    backgroundColor: colors.accent,
+  },
+  allFilterButton: {
+    minWidth: 84,
   },
   listContainer: {
     paddingBottom: spacing.xl,

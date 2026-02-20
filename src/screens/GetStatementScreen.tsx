@@ -11,12 +11,15 @@ import {
 import {
   ActivityIndicator,
   Card,
-  Chip,
   Menu,
   Snackbar,
 } from 'react-native-paper';
 import Button from '../components/Button';
+import FilterMenuButton from '../components/FilterMenuButton';
 import Input from '../components/Input';
+import SegmentedControl, {
+  SegmentedControlOption,
+} from '../components/SegmentedControl';
 import useRecipients from '../hooks/useRecipients';
 import useSession from '../hooks/useSession';
 import {
@@ -34,6 +37,10 @@ import {formatDateDDMMYYYY, parseDateDDMMYYYY} from '../utils/format';
 type DurationMode = 'TILL_DATE' | 'CUSTOM_RANGE';
 
 const ALL_RECIPIENTS_FILTER = 'ALL';
+const durationOptions: SegmentedControlOption<DurationMode>[] = [
+  { value: 'TILL_DATE', label: 'Till date' },
+  { value: 'CUSTOM_RANGE', label: 'Custom range' },
+];
 
 function todayString() {
   return formatDateDDMMYYYY(new Date());
@@ -194,20 +201,19 @@ export default function GetStatementScreen() {
               visible={recipientMenuVisible}
               onDismiss={() => setRecipientMenuVisible(false)}
               anchor={
-                <Chip
-                  mode="flat"
-                  selected
+                <FilterMenuButton
+                  label="People"
+                  value={selectedRecipientLabel}
                   onPress={() => setRecipientMenuVisible(true)}
-                  style={styles.selectorChip}>
-                  {selectedRecipientLabel}
-                </Chip>
+                  style={styles.selectorControl}
+                />
               }>
               <Menu.Item
                 onPress={() => {
                   setRecipientFilterId(ALL_RECIPIENTS_FILTER);
                   setRecipientMenuVisible(false);
                 }}
-                title="All recipients"
+                title="All people"
               />
               {recipients.length > 0 ? (
                 recipients.map(recipient => (
@@ -226,20 +232,13 @@ export default function GetStatementScreen() {
             </Menu>
 
             <Text style={[styles.label, styles.durationLabel]}>Duration</Text>
-            <View style={styles.durationRow}>
-              <Chip
-                selected={durationMode === 'TILL_DATE'}
-                onPress={() => setDurationMode('TILL_DATE')}
-                style={styles.durationChip}>
-                Till date
-              </Chip>
-              <Chip
-                selected={durationMode === 'CUSTOM_RANGE'}
-                onPress={() => setDurationMode('CUSTOM_RANGE')}
-                style={styles.durationChip}>
-                Custom date range
-              </Chip>
-            </View>
+            <SegmentedControl
+              value={durationMode}
+              options={durationOptions}
+              onChange={setDurationMode}
+              equalWidth
+              style={styles.durationControl}
+            />
 
             {durationMode === 'CUSTOM_RANGE' ? (
               <>
@@ -324,22 +323,14 @@ const styles = StyleSheet.create({
     color: colors.muted,
     marginBottom: spacing.xs,
   },
-  selectorChip: {
+  selectorControl: {
     marginBottom: spacing.md,
-    backgroundColor: colors.accent,
   },
   durationLabel: {
     marginTop: spacing.xs,
   },
-  durationRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  durationControl: {
     marginBottom: spacing.md,
-  },
-  durationChip: {
-    marginRight: spacing.sm,
-    marginTop: spacing.xs,
-    backgroundColor: colors.accent,
   },
   tillDateHint: {
     fontSize: 12,
