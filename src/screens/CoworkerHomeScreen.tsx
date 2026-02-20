@@ -84,9 +84,10 @@ export default function CoworkerHomeScreen() {
             <Text style={styles.subtitle}>My ledger</Text>
           </View>
           <OverflowMenu
+            triggerLabel="Account"
             items={[
               {
-                label: signingOut ? 'Signing out...' : 'Sign out',
+                label: signingOut ? 'Signing out...' : 'Sign Out',
                 onPress: handleSignOut,
                 disabled: signingOut,
               },
