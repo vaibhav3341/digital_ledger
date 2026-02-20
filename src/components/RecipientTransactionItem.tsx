@@ -6,7 +6,10 @@ import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import { formatAmountFromCents, formatDate } from '../utils/format';
-import { TransactionPerspective, directionForPerspective } from '../utils/transactions';
+import {
+  TransactionPerspective,
+  directionForPerspective,
+} from '../utils/transactions';
 import Button from './Button';
 
 interface RecipientTransactionItemProps {
