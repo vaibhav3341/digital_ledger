@@ -7,15 +7,20 @@ import {
 } from 'react-native';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
 import AnimatedButton from './AnimatedButton';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
+export type ButtonSize = 'large' | 'compact';
 
 interface ButtonProps {
   label: string;
   onPress: (event?: GestureResponderEvent) => void;
   disabled?: boolean;
   variant?: ButtonVariant;
+  size?: ButtonSize;
+  icon?: string;
+  loading?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -31,35 +36,43 @@ export default function Button({
   onPress,
   disabled,
   variant = 'primary',
+  size = 'large',
+  icon,
+  loading,
   style,
 }: ButtonProps) {
   const buttonColor =
     variant === 'primary'
       ? colors.primary
       : variant === 'danger'
-        ? colors.danger
-        : undefined;
+      ? colors.danger
+      : undefined;
 
   const textColor =
     variant === 'primary' || variant === 'danger'
       ? '#FFFFFF'
       : variant === 'secondary'
-        ? colors.text
-        : colors.primary;
+      ? colors.text
+      : colors.primary;
+
+  const minHeight = size === 'large' ? 48 : 44;
 
   return (
     <AnimatedButton
       mode={modeMap[variant]}
       onPress={onPress}
       disabled={disabled}
+      loading={loading}
+      icon={icon}
       containerStyle={style}
       buttonColor={buttonColor}
       textColor={textColor}
       labelStyle={styles.label}
-      contentStyle={styles.content}
+      contentStyle={[styles.content, { minHeight }]}
       style={[
         styles.base,
         variant === 'secondary' ? styles.secondary : null,
+        variant === 'ghost' ? styles.ghost : null,
       ]}
     >
       {label}
@@ -69,18 +82,19 @@ export default function Button({
 
 const styles = StyleSheet.create({
   base: {
-    paddingVertical: spacing.xs,
+    borderRadius: 12,
     paddingHorizontal: spacing.sm,
-    borderRadius: 10,
   },
   content: {
-    minHeight: 44,
+    minHeight: 48,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
+    ...typography.bodyStrong,
   },
   secondary: {
     backgroundColor: colors.card,
+  },
+  ghost: {
+    borderRadius: 10,
   },
 });

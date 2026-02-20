@@ -11,14 +11,23 @@ import {
 import Contacts from 'react-native-contacts';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Chip, Modal, Portal, Searchbar } from 'react-native-paper';
 import Button from '../components/Button';
+import EmptyState from '../components/EmptyState';
+import FeedbackState from '../components/FeedbackState';
 import Input from '../components/Input';
+import StickyActionBar from '../components/StickyActionBar';
 import useSession from '../hooks/useSession';
 import { RootStackParamList } from '../navigation/RootNavigator';
-import { createRecipientWithPhone, normalizePhoneNumber } from '../services/firestore';
+import {
+  createRecipientWithPhone,
+  normalizePhoneNumber,
+} from '../services/firestore';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
+
+type RecipientMode = 'CONTACTS' | 'MANUAL';
 
 interface ContactCandidate {
   id: string;
@@ -72,12 +81,14 @@ export default function AddRecipientScreen() {
   const { session } = useSession();
   const ledgerId = session?.role === 'ADMIN' ? session.ledgerId : '';
 
+  const [mode, setMode] = useState<RecipientMode>('CONTACTS');
   const [recipientName, setRecipientName] = useState('');
   const [phoneLocalNumber, setPhoneLocalNumber] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [loadingContacts, setLoadingContacts] = useState(false);
-  const [showContactList, setShowContactList] = useState(false);
+
+  const [contactsLoading, setContactsLoading] = useState(false);
   const [contacts, setContacts] = useState<ContactCandidate[]>([]);
+  const [contactPickerVisible, setContactPickerVisible] = useState(false);
   const [contactSearch, setContactSearch] = useState('');
 
   const canSave = useMemo(() => {
@@ -118,9 +129,9 @@ export default function AddRecipientScreen() {
     return granted === PermissionsAndroid.RESULTS.GRANTED;
   };
 
-  const handleLoadContacts = async () => {
+  const loadContacts = async () => {
     try {
-      setLoadingContacts(true);
+      setContactsLoading(true);
       const allowed = await requestContactsPermission();
       if (!allowed) {
         Alert.alert('Contacts permission denied');
@@ -131,18 +142,14 @@ export default function AddRecipientScreen() {
       const candidates = toContactCandidates(allContacts).sort((a, b) =>
         a.name.localeCompare(b.name),
       );
-      if (candidates.length === 0) {
-        Alert.alert('No contacts with phone numbers found');
-        return;
-      }
 
       setContacts(candidates);
       setContactSearch('');
-      setShowContactList(true);
+      setContactPickerVisible(true);
     } catch (error) {
       Alert.alert('Unable to load contacts', String(error));
     } finally {
-      setLoadingContacts(false);
+      setContactsLoading(false);
     }
   };
 
@@ -150,7 +157,7 @@ export default function AddRecipientScreen() {
     setRecipientName(contact.name);
     setPhoneLocalNumber(toIndianLocalNumber(contact.phoneNumber));
     setContactSearch('');
-    setShowContactList(false);
+    setContactPickerVisible(false);
   };
 
   const handlePhoneChange = (value: string) => {
@@ -162,9 +169,8 @@ export default function AddRecipientScreen() {
       Alert.alert('Admin session is required');
       return;
     }
-
     if (!canSave) {
-      Alert.alert('Enter recipient name and valid phone number');
+      Alert.alert('Enter name and valid phone number');
       return;
     }
 
@@ -184,128 +190,195 @@ export default function AddRecipientScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Add Recipient</Text>
-      <Text style={styles.subtitle}>
-        Add recipient name and phone number. Pick from contacts or enter manually.
-      </Text>
+    <View style={styles.screen}>
+      <View style={styles.contentWrap}>
+        <Text style={styles.title}>Add Recipient</Text>
 
-      <Button
-        label={loadingContacts ? 'Loading Contacts...' : 'Select from Contacts'}
-        variant="secondary"
-        onPress={handleLoadContacts}
-        disabled={loadingContacts || submitting}
-        style={styles.actionButton}
-      />
+        <View style={styles.modeRow}>
+          <Chip
+            selected={mode === 'CONTACTS'}
+            onPress={() => setMode('CONTACTS')}
+            style={styles.modeChip}
+          >
+            From Contacts
+          </Chip>
+          <Chip
+            selected={mode === 'MANUAL'}
+            onPress={() => setMode('MANUAL')}
+            style={styles.modeChip}
+          >
+            Manual
+          </Chip>
+        </View>
 
-      {showContactList ? (
-        <View style={styles.contactListCard}>
-          <View style={styles.contactHeader}>
-            <Text style={styles.contactTitle}>Choose Contact</Text>
+        <View style={styles.formCard}>
+          {mode === 'CONTACTS' ? (
             <Button
-              label="Hide"
-              variant="ghost"
-              onPress={() => setShowContactList(false)}
+              label={contactsLoading ? 'Loading contacts...' : 'Select from Contacts'}
+              variant="secondary"
+              onPress={loadContacts}
+              disabled={contactsLoading || submitting}
+              style={styles.contactButton}
             />
-          </View>
+          ) : null}
+
           <Input
-            label="Search Contacts"
-            value={contactSearch}
-            placeholder="Search by name or phone number"
-            onChangeText={setContactSearch}
+            label="Recipient Name"
+            value={recipientName}
+            placeholder="Enter recipient name"
+            onChangeText={setRecipientName}
           />
-          <FlatList
-            data={filteredContacts}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <Button
-                label={`${item.name} • ${item.phoneNumber}`}
-                variant="secondary"
-                onPress={() => handlePickContact(item)}
-                style={styles.contactRow}
-              />
-            )}
-            ListEmptyComponent={
-              <Text style={styles.contactEmpty}>No contacts found for this search.</Text>
-            }
-            contentContainerStyle={styles.contactListContent}
+          <Input
+            label="Phone Number"
+            value={phoneLocalNumber}
+            placeholder="9876543210"
+            prefixText="+91"
+            keyboardType="phone-pad"
+            maxLength={10}
+            onChangeText={handlePhoneChange}
           />
         </View>
-      ) : null}
+      </View>
 
-      <Input
-        label="Recipient Name"
-        value={recipientName}
-        placeholder="Enter recipient name"
-        onChangeText={setRecipientName}
-      />
-      <Input
-        label="Phone Number"
-        value={phoneLocalNumber}
-        placeholder="9876543210"
-        prefixText="+91"
-        keyboardType="phone-pad"
-        maxLength={10}
-        onChangeText={handlePhoneChange}
+      <StickyActionBar
+        actions={[
+          {
+            label: submitting ? 'Saving...' : 'Add Recipient',
+            onPress: handleSave,
+            disabled: submitting || !canSave,
+            loading: submitting,
+          },
+        ]}
       />
 
-      <Button
-        label={submitting ? 'Saving...' : 'Add Recipient'}
-        onPress={handleSave}
-        disabled={submitting}
-      />
+      <Portal>
+        <Modal
+          visible={contactPickerVisible}
+          onDismiss={() => setContactPickerVisible(false)}
+          contentContainerStyle={styles.modalContainer}
+        >
+          <Text style={styles.modalTitle}>Select Contact</Text>
+          <Searchbar
+            placeholder="Search name or phone"
+            value={contactSearch}
+            onChangeText={setContactSearch}
+            style={styles.searchbar}
+          />
+
+          {contactsLoading ? (
+            <FeedbackState
+              variant="loading"
+              title="Loading contacts..."
+              subtitle="This may take a few seconds."
+            />
+          ) : (
+            <FlatList
+              data={filteredContacts}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <Button
+                  label={`${item.name} - ${item.phoneNumber}`}
+                  variant="secondary"
+                  size="compact"
+                  onPress={() => handlePickContact(item)}
+                  style={styles.contactRow}
+                />
+              )}
+              ListEmptyComponent={
+                contacts.length === 0 ? (
+                  <EmptyState
+                    title="No contacts with phone number"
+                    subtitle="Try manual mode to continue."
+                  />
+                ) : (
+                  <EmptyState
+                    title="No matching contacts"
+                    subtitle="Try another search term."
+                  />
+                )
+              }
+              contentContainerStyle={
+                filteredContacts.length === 0
+                  ? styles.modalEmptyContainer
+                  : styles.modalListContainer
+              }
+            />
+          )}
+
+          <Button
+            label="Close"
+            variant="ghost"
+            onPress={() => setContactPickerVisible(false)}
+            style={styles.modalClose}
+          />
+        </Modal>
+      </Portal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
     backgroundColor: colors.background,
-    padding: spacing.lg,
+  },
+  contentWrap: {
+    flex: 1,
+    paddingHorizontal: spacing.screenHorizontal,
+    paddingTop: spacing.lg,
   },
   title: {
-    ...typography.title,
+    ...typography.heading,
     color: colors.text,
-    marginBottom: spacing.xs,
   },
-  subtitle: {
-    ...typography.body,
-    color: colors.muted,
-    marginBottom: spacing.md,
+  modeRow: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
   },
-  actionButton: {
-    marginBottom: spacing.md,
+  modeChip: {
+    marginRight: spacing.sm,
+    backgroundColor: colors.chip,
   },
-  contactListCard: {
+  formCard: {
+    marginTop: spacing.md,
+    backgroundColor: colors.card,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.card,
-    maxHeight: 360,
+    padding: spacing.lg,
+  },
+  contactButton: {
     marginBottom: spacing.md,
+  },
+  modalContainer: {
+    margin: spacing.lg,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 16,
     padding: spacing.md,
+    maxHeight: '84%',
   },
-  contactHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  contactTitle: {
-    fontSize: 14,
-    fontWeight: '700',
+  modalTitle: {
+    ...typography.subtitle,
     color: colors.text,
   },
-  contactListContent: {
-    paddingTop: spacing.sm,
+  searchbar: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.background,
   },
   contactRow: {
     marginBottom: spacing.xs,
   },
-  contactEmpty: {
-    ...typography.body,
-    color: colors.muted,
-    textAlign: 'center',
-    paddingVertical: spacing.md,
+  modalListContainer: {
+    paddingBottom: spacing.sm,
+  },
+  modalEmptyContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  modalClose: {
+    marginTop: spacing.sm,
   },
 });

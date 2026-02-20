@@ -11,7 +11,7 @@ export const paperTheme = {
     secondary: colors.accent,
     background: colors.background,
     surface: colors.card,
-    surfaceVariant: '#EEF3FA',
+    surfaceVariant: colors.chip,
     onPrimary: '#FFFFFF',
     onSurface: colors.text,
     onSurfaceVariant: colors.muted,
