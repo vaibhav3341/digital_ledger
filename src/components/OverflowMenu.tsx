@@ -1,7 +1,9 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
-import { IconButton, Menu } from 'react-native-paper';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Menu } from 'react-native-paper';
 import { colors } from '../theme/colors';
+import { spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
 
 interface OverflowMenuItem {
   label: string;
@@ -11,27 +13,37 @@ interface OverflowMenuItem {
 
 interface OverflowMenuProps {
   items: OverflowMenuItem[];
-  icon?: string;
+  triggerLabel?: string;
 }
 
 export default function OverflowMenu({
   items,
-  icon = 'dots-vertical',
+  triggerLabel = 'Actions',
 }: OverflowMenuProps) {
   const [visible, setVisible] = React.useState(false);
+  const isTriggerDisabled = items.every((item) => item.disabled);
 
   return (
     <Menu
       visible={visible}
       onDismiss={() => setVisible(false)}
       anchor={
-        <IconButton
-          icon={icon}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={triggerLabel}
+          disabled={isTriggerDisabled}
           onPress={() => setVisible(true)}
-          iconColor={colors.text}
-          style={styles.trigger}
-          size={20}
-        />
+          style={({ pressed }) => [
+            styles.trigger,
+            pressed ? styles.triggerPressed : null,
+            isTriggerDisabled ? styles.triggerDisabled : null,
+          ]}
+        >
+          <Text style={styles.triggerText}>{triggerLabel}</Text>
+          <View style={styles.caretWrap}>
+            <Text style={styles.caret}>v</Text>
+          </View>
+        </Pressable>
       }
     >
       {items.map((item, index) => (
@@ -51,6 +63,31 @@ export default function OverflowMenu({
 
 const styles = StyleSheet.create({
   trigger: {
-    margin: 0,
+    minHeight: 44,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    backgroundColor: colors.card,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  triggerPressed: {
+    backgroundColor: colors.accent,
+  },
+  triggerDisabled: {
+    opacity: 0.5,
+  },
+  triggerText: {
+    ...typography.bodyStrong,
+    color: colors.text,
+  },
+  caretWrap: {
+    marginLeft: spacing.xs,
+  },
+  caret: {
+    ...typography.bodyStrong,
+    color: colors.muted,
   },
 });

@@ -210,13 +210,14 @@ export default function AdminHomeScreen() {
             </Text>
           </View>
           <OverflowMenu
+            triggerLabel="Actions"
             items={[
               {
-                label: 'Get statement',
+                label: 'Get Statement',
                 onPress: () => navigation.navigate('GetStatement'),
               },
               {
-                label: signingOut ? 'Signing out...' : 'Sign out',
+                label: signingOut ? 'Signing out...' : 'Sign Out',
                 onPress: handleSignOut,
                 disabled: signingOut,
               },
