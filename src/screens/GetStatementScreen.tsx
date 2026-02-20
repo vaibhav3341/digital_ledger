@@ -11,8 +11,12 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Chip, Menu, Modal, Portal, Snackbar } from 'react-native-paper';
+import { Menu, Modal, Portal, Snackbar } from 'react-native-paper';
 import Button from '../components/Button';
+import FilterMenuButton from '../components/FilterMenuButton';
+import SegmentedControl, {
+  SegmentedControlOption,
+} from '../components/SegmentedControl';
 import StickyActionBar from '../components/StickyActionBar';
 import useRecipients from '../hooks/useRecipients';
 import useSession from '../hooks/useSession';
@@ -32,6 +36,11 @@ type DurationMode = 'TILL_DATE' | 'THIS_MONTH' | 'CUSTOM';
 type DateTarget = 'START' | 'END';
 
 const ALL_RECIPIENTS_FILTER = 'ALL';
+const durationOptions: SegmentedControlOption<DurationMode>[] = [
+  { value: 'TILL_DATE', label: 'Till date' },
+  { value: 'THIS_MONTH', label: 'This month' },
+  { value: 'CUSTOM', label: 'Custom' },
+];
 const monthNames = [
   'January',
   'February',
@@ -164,8 +173,8 @@ export default function GetStatementScreen() {
 
   const selectedRecipientLabel =
     recipientFilterId === ALL_RECIPIENTS_FILTER
-      ? 'All'
-      : recipientNameById[recipientFilterId] || 'Selected';
+      ? 'All people'
+      : recipientNameById[recipientFilterId] || 'Selected person';
 
   const calendarDays = useMemo(
     () => buildCalendarDays(calendarMonthCursor),
@@ -250,10 +259,10 @@ export default function GetStatementScreen() {
         durationMode === 'CUSTOM'
           ? startOfDay(customStartDate)
           : durationMode === 'THIS_MONTH'
-          ? startOfDay(monthStartDate())
-          : firstTxnDate
-          ? startOfDay(firstTxnDate)
-          : startOfDay(new Date());
+            ? startOfDay(monthStartDate())
+            : firstTxnDate
+              ? startOfDay(firstTxnDate)
+              : startOfDay(new Date());
 
       const generated = await generateStatementPdf({
         adminName,
@@ -289,13 +298,12 @@ export default function GetStatementScreen() {
             visible={recipientMenuVisible}
             onDismiss={() => setRecipientMenuVisible(false)}
             anchor={
-              <Chip
-                selected
+              <FilterMenuButton
+                label="People"
+                value={selectedRecipientLabel}
                 onPress={() => setRecipientMenuVisible(true)}
-                style={styles.scopeChip}
-              >
-                {selectedRecipientLabel}
-              </Chip>
+                style={styles.selectorControl}
+              />
             }
           >
             <Menu.Item
@@ -303,7 +311,7 @@ export default function GetStatementScreen() {
                 setRecipientFilterId(ALL_RECIPIENTS_FILTER);
                 setRecipientMenuVisible(false);
               }}
-              title="All"
+              title="All people"
             />
             {recipients.length > 0 ? (
               recipients.map((recipient) => (
@@ -324,29 +332,13 @@ export default function GetStatementScreen() {
 
         <View style={styles.card}>
           <Text style={styles.sectionLabel}>Range</Text>
-          <View style={styles.rangeRow}>
-            <Chip
-              selected={durationMode === 'TILL_DATE'}
-              onPress={() => setDurationMode('TILL_DATE')}
-              style={styles.rangeChip}
-            >
-              Till date
-            </Chip>
-            <Chip
-              selected={durationMode === 'THIS_MONTH'}
-              onPress={() => setDurationMode('THIS_MONTH')}
-              style={styles.rangeChip}
-            >
-              This month
-            </Chip>
-            <Chip
-              selected={durationMode === 'CUSTOM'}
-              onPress={() => setDurationMode('CUSTOM')}
-              style={styles.rangeChip}
-            >
-              Custom
-            </Chip>
-          </View>
+          <SegmentedControl
+            value={durationMode}
+            options={durationOptions}
+            onChange={setDurationMode}
+            equalWidth
+            style={styles.durationControl}
+          />
 
           {durationMode === 'CUSTOM' ? (
             <View>
@@ -396,10 +388,10 @@ export default function GetStatementScreen() {
                   customEndDate,
                 )}`
               : durationMode === 'THIS_MONTH'
-              ? `${formatDateDDMMYYYY(monthStartDate())} to ${formatDateDDMMYYYY(
-                  todayDate(),
-                )}`
-              : `Till ${formatDateDDMMYYYY(todayDate())}`}
+                ? `${formatDateDDMMYYYY(monthStartDate())} to ${formatDateDDMMYYYY(
+                    todayDate(),
+                  )}`
+                : `Till ${formatDateDDMMYYYY(todayDate())}`}
           </Text>
 
           {lastSavedLabel ? (
@@ -491,7 +483,8 @@ export default function GetStatementScreen() {
               if (!dateCell) {
                 return <View key={`empty-${index}`} style={styles.dayCellWrap} />;
               }
-              const selectedDate = dateTarget === 'START' ? customStartDate : customEndDate;
+              const selectedDate =
+                dateTarget === 'START' ? customStartDate : customEndDate;
               const isActive = isSameDay(dateCell, selectedDate);
               const key = `day-${dateCell.getFullYear()}-${dateCell.getMonth()}-${dateCell.getDate()}`;
 
@@ -588,19 +581,11 @@ const styles = StyleSheet.create({
     color: colors.muted,
     marginBottom: spacing.sm,
   },
-  scopeChip: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.chip,
-  },
-  rangeRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: spacing.sm,
-  },
-  rangeChip: {
-    marginRight: spacing.sm,
+  selectorControl: {
     marginBottom: spacing.xs,
-    backgroundColor: colors.chip,
+  },
+  durationControl: {
+    marginBottom: spacing.sm,
   },
   dateField: {
     borderWidth: 1,
