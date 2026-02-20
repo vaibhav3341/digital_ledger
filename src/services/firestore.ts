@@ -1,4 +1,6 @@
-import firestore from '@react-native-firebase/firestore';
+import firestore, {
+  FirebaseFirestoreTypes,
+} from '@react-native-firebase/firestore';
 import {
   AdminSession,
   AppSession,
@@ -558,6 +560,200 @@ export async function createRecipientLedgerTransaction(params: {
     txnAt,
     recipientNameSnapshot,
   });
+}
+
+type FirestoreDocRef = FirebaseFirestoreTypes.DocumentReference<
+  FirebaseFirestoreTypes.DocumentData
+>;
+
+function summarizeLedgerTransactions(transactions: LedgerTransaction[]) {
+  let totalSentCents = 0;
+  let totalReceivedCents = 0;
+  let lastTxnAt: FirebaseFirestoreTypes.Timestamp | null = null;
+  let lastTxnMillis = 0;
+
+  transactions.forEach((transaction) => {
+    if (transaction.direction === 'SENT') {
+      totalSentCents += transaction.amountCents;
+    } else {
+      totalReceivedCents += transaction.amountCents;
+    }
+
+    const txnMillis = transaction.txnAt?.toMillis?.() || 0;
+    if (txnMillis >= lastTxnMillis && transaction.txnAt) {
+      lastTxnAt = transaction.txnAt;
+      lastTxnMillis = txnMillis;
+    }
+  });
+
+  return {
+    totalSentCents,
+    totalReceivedCents,
+    netCents: totalSentCents - totalReceivedCents,
+    lastTxnAt,
+  };
+}
+
+async function refreshRecipientSummary(params: {
+  recipientId: string;
+  ledgerId: string;
+}) {
+  const { recipientId, ledgerId } = params;
+  const recipientSummaryRef = db.collection('recipientSummaries').doc(recipientId);
+
+  const transactionsSnapshot = await db
+    .collection('transactions')
+    .where('recipientId', '==', recipientId)
+    .get();
+  const transactions = transactionsSnapshot.docs.map(
+    (doc) => doc.data() as LedgerTransaction,
+  );
+
+  if (transactions.length === 0) {
+    await recipientSummaryRef.delete();
+    return;
+  }
+
+  const summary = summarizeLedgerTransactions(transactions);
+  await recipientSummaryRef.set(
+    {
+      recipientId,
+      ledgerId,
+      totalSentCents: summary.totalSentCents,
+      totalReceivedCents: summary.totalReceivedCents,
+      netCents: summary.netCents,
+      lastTxnAt: summary.lastTxnAt,
+    },
+    { merge: false },
+  );
+}
+
+async function refreshLedgerSummary(ledgerId: string) {
+  const ledgerSummaryRef = db.collection('ledgerSummaries').doc(ledgerId);
+
+  const transactionsSnapshot = await db
+    .collection('transactions')
+    .where('ledgerId', '==', ledgerId)
+    .get();
+  const transactions = transactionsSnapshot.docs.map(
+    (doc) => doc.data() as LedgerTransaction,
+  );
+
+  if (transactions.length === 0) {
+    await ledgerSummaryRef.delete();
+    return;
+  }
+
+  const summary = summarizeLedgerTransactions(transactions);
+  await ledgerSummaryRef.set(
+    {
+      ledgerId,
+      totalSentCents: summary.totalSentCents,
+      totalReceivedCents: summary.totalReceivedCents,
+      lastTxnAt: summary.lastTxnAt,
+    },
+    { merge: false },
+  );
+}
+
+function uniqueDocumentRefs(refs: FirestoreDocRef[]) {
+  const seenPaths = new Set<string>();
+  return refs.filter((ref) => {
+    if (seenPaths.has(ref.path)) {
+      return false;
+    }
+    seenPaths.add(ref.path);
+    return true;
+  });
+}
+
+async function deleteDocumentRefsInBatches(refs: FirestoreDocRef[]) {
+  const chunkSize = 400;
+  for (let index = 0; index < refs.length; index += chunkSize) {
+    const batch = db.batch();
+    refs.slice(index, index + chunkSize).forEach((ref) => {
+      batch.delete(ref);
+    });
+    await batch.commit();
+  }
+}
+
+export async function deleteTransactionEntry(params: { txnId: string }) {
+  const txnId = params.txnId.trim();
+  if (!txnId) {
+    throw new Error('Transaction is required.');
+  }
+
+  const transactionRef = db.collection('transactions').doc(txnId);
+  const transactionSnapshot = await transactionRef.get();
+  if (!transactionSnapshot.exists()) {
+    throw new Error('Transaction not found.');
+  }
+
+  const transaction = transactionSnapshot.data() as LedgerTransaction;
+  await transactionRef.delete();
+
+  try {
+    await Promise.all([
+      refreshRecipientSummary({
+        recipientId: transaction.recipientId,
+        ledgerId: transaction.ledgerId,
+      }),
+      refreshLedgerSummary(transaction.ledgerId),
+    ]);
+  } catch (error) {
+    console.warn('Transaction deleted, but summary refresh failed.', error);
+  }
+}
+
+export async function deleteRecipientEntry(params: { recipientId: string }) {
+  const recipientId = params.recipientId.trim();
+  if (!recipientId) {
+    throw new Error('Recipient is required.');
+  }
+
+  const recipientRef = db.collection('recipients').doc(recipientId);
+  const recipientSnapshot = await recipientRef.get();
+  if (!recipientSnapshot.exists()) {
+    throw new Error('Recipient not found.');
+  }
+
+  const recipient = recipientSnapshot.data() as RecipientModel;
+  const transactionsSnapshot = await db
+    .collection('transactions')
+    .where('recipientId', '==', recipientId)
+    .get();
+  const phoneMappingSnapshot = await db
+    .collection('recipientPhoneMappings')
+    .where('recipientId', '==', recipientId)
+    .get();
+
+  const refsToDelete: FirestoreDocRef[] = [
+    recipientRef,
+    db.collection('recipientSummaries').doc(recipientId),
+  ];
+
+  if (recipient.phoneNormalized?.trim()) {
+    refsToDelete.push(
+      db.collection('recipientPhoneMappings').doc(recipient.phoneNormalized),
+    );
+  }
+
+  transactionsSnapshot.docs.forEach((doc) => {
+    refsToDelete.push(doc.ref);
+  });
+
+  phoneMappingSnapshot.docs.forEach((doc) => {
+    refsToDelete.push(doc.ref);
+  });
+
+  await deleteDocumentRefsInBatches(uniqueDocumentRefs(refsToDelete));
+
+  try {
+    await refreshLedgerSummary(recipient.ledgerId);
+  } catch (error) {
+    console.warn('Recipient deleted, but ledger summary refresh failed.', error);
+  }
 }
 
 export async function createTransactionEntry(params: {

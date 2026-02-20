@@ -1,12 +1,15 @@
-import React from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import Button from '../components/Button';
+import { Chip } from 'react-native-paper';
 import EmptyState from '../components/EmptyState';
+import FeedbackState from '../components/FeedbackState';
 import RecipientTransactionItem from '../components/RecipientTransactionItem';
+import StickyActionBar from '../components/StickyActionBar';
 import useRecipientTransactions from '../hooks/useRecipientTransactions';
 import { RootStackParamList } from '../navigation/RootNavigator';
+import { deleteTransactionEntry } from '../services/firestore';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
@@ -16,91 +19,175 @@ import {
 } from '../utils/format';
 import { summarizeTransactions } from '../utils/transactions';
 
+type DirectionFilter = 'ALL' | 'SENT' | 'RECEIVED';
+
 export default function RecipientLedgerScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'RecipientLedger'>>();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { recipientId, recipientName, isReadOnly } = route.params;
-  const { transactions } = useRecipientTransactions(recipientId);
-  const summary = summarizeTransactions(transactions);
+  const { transactions, loading } = useRecipientTransactions(recipientId);
+
+  const [deletingTxnId, setDeletingTxnId] = useState<string | null>(null);
+  const [directionFilter, setDirectionFilter] = useState<DirectionFilter>('ALL');
+
+  const summary = useMemo(() => summarizeTransactions(transactions), [transactions]);
+
+  const filteredTransactions = useMemo(() => {
+    if (directionFilter === 'ALL') {
+      return transactions;
+    }
+    return transactions.filter((transaction) => transaction.direction === directionFilter);
+  }, [directionFilter, transactions]);
+
+  const handleDeleteTransaction = (txnId: string) => {
+    Alert.alert('Delete transaction', 'Delete this recipient transaction?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            try {
+              setDeletingTxnId(txnId);
+              await deleteTransactionEntry({ txnId });
+            } catch (error) {
+              Alert.alert('Failed to delete transaction', String(error));
+            } finally {
+              setDeletingTxnId((current) => (current === txnId ? null : current));
+            }
+          })();
+        },
+      },
+    ]);
+  };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>{recipientName}</Text>
-      <Text style={styles.subtitle}>Recipient Ledger</Text>
+    <View style={styles.screen}>
+      <View style={styles.contentWrap}>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>{recipientName}</Text>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>Sent</Text>
+              <Text style={styles.summaryValue}>
+                {formatAmountFromCents(summary.totalSentCents)}
+              </Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>Received</Text>
+              <Text style={styles.summaryValue}>
+                {formatAmountFromCents(summary.totalReceivedCents)}
+              </Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>Net</Text>
+              <Text style={styles.summaryValue}>
+                {formatSignedAmountFromCents(summary.netCents)}
+              </Text>
+            </View>
+          </View>
+        </View>
 
-      <View style={styles.summaryCard}>
-        <Text style={styles.summaryText}>
-          Sent: {formatAmountFromCents(summary.totalSentCents)}
-        </Text>
-        <Text style={styles.summaryText}>
-          Received: {formatAmountFromCents(summary.totalReceivedCents)}
-        </Text>
-        <Text style={styles.summaryNet}>
-          Net: {formatSignedAmountFromCents(summary.netCents)}
-        </Text>
+        <View style={styles.filterRow}>
+          <Chip
+            selected={directionFilter === 'ALL'}
+            onPress={() => setDirectionFilter('ALL')}
+            style={styles.filterChip}
+          >
+            All
+          </Chip>
+          <Chip
+            selected={directionFilter === 'SENT'}
+            onPress={() => setDirectionFilter('SENT')}
+            style={styles.filterChip}
+          >
+            Sent
+          </Chip>
+          <Chip
+            selected={directionFilter === 'RECEIVED'}
+            onPress={() => setDirectionFilter('RECEIVED')}
+            style={styles.filterChip}
+          >
+            Received
+          </Chip>
+        </View>
+
+        <View style={styles.listWrap}>
+          {loading ? (
+            <FeedbackState
+              variant="loading"
+              title="Loading transactions..."
+              subtitle="Pulling recipient history."
+            />
+          ) : (
+            <FlatList
+              data={filteredTransactions}
+              keyExtractor={(item) => item.txnId}
+              renderItem={({ item }) => (
+                <RecipientTransactionItem
+                  item={item}
+                  onDelete={
+                    !isReadOnly ? () => handleDeleteTransaction(item.txnId) : undefined
+                  }
+                  deleteDisabled={deletingTxnId === item.txnId}
+                />
+              )}
+              ListEmptyComponent={
+                <EmptyState
+                  title="No transactions yet"
+                  subtitle="Use Send or Receive to add the first entry."
+                />
+              }
+              contentContainerStyle={
+                filteredTransactions.length === 0
+                  ? styles.emptyContainer
+                  : styles.listContainer
+              }
+              showsVerticalScrollIndicator={false}
+            />
+          )}
+        </View>
       </View>
 
       {!isReadOnly ? (
-        <View style={styles.actionRow}>
-          <Button
-            label="Send"
-            onPress={() =>
-              navigation.navigate('AddTransaction', {
-                recipientId,
-                recipientName,
-                initialDirection: 'SENT',
-              })
-            }
-            style={styles.actionButton}
-          />
-          <Button
-            label="Receive"
-            onPress={() =>
-              navigation.navigate('AddTransaction', {
-                recipientId,
-                recipientName,
-                initialDirection: 'RECEIVED',
-              })
-            }
-            style={styles.actionButton}
-          />
-        </View>
+        <StickyActionBar
+          actions={[
+            {
+              label: 'Send',
+              onPress: () =>
+                navigation.navigate('AddTransaction', {
+                  recipientId,
+                  recipientName,
+                  initialDirection: 'SENT',
+                }),
+            },
+            {
+              label: 'Receive',
+              variant: 'secondary',
+              onPress: () =>
+                navigation.navigate('AddTransaction', {
+                  recipientId,
+                  recipientName,
+                  initialDirection: 'RECEIVED',
+                }),
+            },
+          ]}
+        />
       ) : null}
-
-      <FlatList
-        data={transactions}
-        keyExtractor={(item) => item.txnId}
-        renderItem={({ item }) => <RecipientTransactionItem item={item} />}
-        ListEmptyComponent={
-          <EmptyState
-            title="No recipient transactions"
-            subtitle="No recipient-specific entries yet."
-          />
-        }
-        contentContainerStyle={
-          transactions.length === 0 ? styles.emptyContainer : styles.listContainer
-        }
-      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
     backgroundColor: colors.background,
-    padding: spacing.lg,
   },
-  title: {
-    ...typography.title,
-    color: colors.text,
-  },
-  subtitle: {
-    ...typography.body,
-    color: colors.muted,
-    marginTop: spacing.xs,
-    marginBottom: spacing.md,
+  contentWrap: {
+    flex: 1,
+    paddingHorizontal: spacing.screenHorizontal,
+    paddingTop: spacing.lg,
   },
   summaryCard: {
     backgroundColor: colors.card,
@@ -108,31 +195,44 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderWidth: 1,
     padding: spacing.lg,
-    marginBottom: spacing.md,
   },
-  summaryText: {
-    fontSize: 13,
+  summaryTitle: {
+    ...typography.subtitle,
     color: colors.text,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
   },
-  summaryNet: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.primary,
-    marginTop: spacing.xs,
-  },
-  actionRow: {
+  summaryRow: {
     flexDirection: 'row',
-    marginBottom: spacing.md,
   },
-  actionButton: {
+  summaryItem: {
     flex: 1,
+  },
+  summaryLabel: {
+    ...typography.caption,
+    color: colors.muted,
+  },
+  summaryValue: {
+    ...typography.bodyStrong,
+    color: colors.text,
+    marginTop: spacing.xxs,
+  },
+  filterRow: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    marginBottom: spacing.sm,
+  },
+  filterChip: {
     marginRight: spacing.sm,
+    backgroundColor: colors.chip,
+  },
+  listWrap: {
+    flex: 1,
   },
   listContainer: {
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.lg,
   },
   emptyContainer: {
     flexGrow: 1,
+    justifyContent: 'center',
   },
 });

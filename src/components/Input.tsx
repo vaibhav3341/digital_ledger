@@ -1,8 +1,9 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { TextInput as PaperTextInput } from 'react-native-paper';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
 
 interface InputProps {
   label?: string;
@@ -13,6 +14,9 @@ interface InputProps {
   secureTextEntry?: boolean;
   prefixText?: string;
   maxLength?: number;
+  helperText?: string;
+  errorText?: string;
+  disabled?: boolean;
 }
 
 export default function Input({
@@ -24,7 +28,12 @@ export default function Input({
   secureTextEntry,
   prefixText,
   maxLength,
+  helperText,
+  errorText,
+  disabled,
 }: InputProps) {
+  const isError = Boolean(errorText);
+
   return (
     <View style={styles.wrapper}>
       <PaperTextInput
@@ -37,12 +46,18 @@ export default function Input({
         keyboardType={keyboardType}
         secureTextEntry={secureTextEntry}
         maxLength={maxLength}
+        disabled={disabled}
         style={styles.input}
-        outlineStyle={styles.outline}
+        outlineStyle={[styles.outline, isError ? styles.outlineError : null]}
+        activeOutlineColor={isError ? colors.danger : colors.primary}
         left={
           prefixText ? <PaperTextInput.Affix text={prefixText} /> : undefined
         }
       />
+      {isError ? <Text style={styles.errorText}>{errorText}</Text> : null}
+      {!isError && helperText ? (
+        <Text style={styles.helperText}>{helperText}</Text>
+      ) : null}
     </View>
   );
 }
@@ -53,8 +68,24 @@ const styles = StyleSheet.create({
   },
   input: {
     backgroundColor: colors.card,
+    minHeight: 48,
   },
   outline: {
-    borderRadius: 10,
+    borderRadius: 12,
+  },
+  outlineError: {
+    borderColor: colors.danger,
+  },
+  helperText: {
+    ...typography.caption,
+    color: colors.muted,
+    marginTop: spacing.xs,
+    marginHorizontal: spacing.xs,
+  },
+  errorText: {
+    ...typography.caption,
+    color: colors.danger,
+    marginTop: spacing.xs,
+    marginHorizontal: spacing.xs,
   },
 });

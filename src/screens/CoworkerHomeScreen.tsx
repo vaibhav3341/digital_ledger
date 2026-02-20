@@ -1,106 +1,173 @@
 import React from 'react';
-import {FlatList, StyleSheet, Text, View} from 'react-native';
-import Button from '../components/Button';
+import { SectionList, StyleSheet, Text, View } from 'react-native';
 import EmptyState from '../components/EmptyState';
+import FeedbackState from '../components/FeedbackState';
+import OverflowMenu from '../components/OverflowMenu';
 import RecipientTransactionItem from '../components/RecipientTransactionItem';
 import useRecipientTransactions from '../hooks/useRecipientTransactions';
 import useSession from '../hooks/useSession';
-import {colors} from '../theme/colors';
-import {spacing} from '../theme/spacing';
-import {typography} from '../theme/typography';
+import { colors } from '../theme/colors';
+import { spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
 import {
   formatAmountFromCents,
   formatSignedAmountFromCents,
 } from '../utils/format';
-import {summarizeTransactionsForPerspective} from '../utils/transactions';
+import { summarizeTransactionsForPerspective } from '../utils/transactions';
+
+interface MonthSection {
+  title: string;
+  data: ReturnType<typeof useRecipientTransactions>['transactions'];
+}
+
+function monthLabel(date: Date) {
+  return date.toLocaleString('en-IN', {
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+function monthKey(date: Date) {
+  return `${date.getFullYear()}-${date.getMonth() + 1}`;
+}
 
 export default function CoworkerHomeScreen() {
-  const {session, signOut} = useSession();
+  const { session, signOut } = useSession();
   const recipientId =
     session?.role === 'COWORKER' ? session.recipientId : undefined;
   const recipientName =
     session?.role === 'COWORKER' ? session.recipientName : 'Recipient';
-  const {transactions} = useRecipientTransactions(recipientId);
+  const { transactions, loading } = useRecipientTransactions(recipientId);
+
   const summary = React.useMemo(
     () => summarizeTransactionsForPerspective(transactions, 'COWORKER'),
     [transactions],
   );
+
   const [signingOut, setSigningOut] = React.useState(false);
+
+  const sections = React.useMemo<MonthSection[]>(() => {
+    const groups: Record<string, MonthSection> = {};
+
+    transactions.forEach((transaction) => {
+      const date = transaction.txnAt?.toDate?.();
+      if (!date) {
+        return;
+      }
+      const key = monthKey(date);
+      if (!groups[key]) {
+        groups[key] = { title: monthLabel(date), data: [] };
+      }
+      groups[key].data.push(transaction);
+    });
+
+    return Object.keys(groups)
+      .sort((left, right) => (left < right ? 1 : -1))
+      .map((key) => groups[key]);
+  }, [transactions]);
 
   const handleSignOut = async () => {
     try {
       setSigningOut(true);
       await signOut();
-    } catch (error) {
-      console.warn('Sign out failed', error);
     } finally {
       setSigningOut(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.headerRow}>
-        <View>
-          <Text style={styles.title}>{recipientName}</Text>
-          <Text style={styles.subtitle}>Your recipient ledger (view-only)</Text>
-        </View>
-        <Button
-          label={signingOut ? 'Signing out...' : 'Sign Out'}
-          variant="ghost"
-          onPress={handleSignOut}
-          disabled={signingOut}
-        />
-      </View>
-
-      <View style={styles.summaryCard}>
-        <Text style={styles.summaryText}>
-          Sent: {formatAmountFromCents(summary.totalSentCents)}
-        </Text>
-        <Text style={styles.summaryText}>
-          Received: {formatAmountFromCents(summary.totalReceivedCents)}
-        </Text>
-        <Text style={styles.summaryNet}>
-          Net: {formatSignedAmountFromCents(summary.netCents)}
-        </Text>
-      </View>
-
-      <FlatList
-        data={transactions}
-        keyExtractor={item => item.txnId}
-        renderItem={({item}) => (
-          <RecipientTransactionItem item={item} perspective="COWORKER" />
-        )}
-        ListEmptyComponent={
-          <EmptyState
-            title="No transactions"
-            subtitle="Your recipient ledger is empty."
+    <View style={styles.screen}>
+      <View style={styles.contentWrap}>
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.title}>{recipientName}</Text>
+            <Text style={styles.subtitle}>My ledger</Text>
+          </View>
+          <OverflowMenu
+            items={[
+              {
+                label: signingOut ? 'Signing out...' : 'Sign out',
+                onPress: handleSignOut,
+                disabled: signingOut,
+              },
+            ]}
           />
-        }
-        contentContainerStyle={
-          transactions.length === 0
-            ? styles.emptyContainer
-            : styles.listContainer
-        }
-      />
+        </View>
+
+        <View style={styles.heroCard}>
+          <Text style={styles.heroLabel}>Net balance</Text>
+          <Text style={styles.heroValue}>
+            {formatSignedAmountFromCents(summary.netCents)}
+          </Text>
+          <View style={styles.heroRow}>
+            <View style={styles.heroChip}>
+              <Text style={styles.heroChipLabel}>Sent</Text>
+              <Text style={styles.heroChipValue}>
+                {formatAmountFromCents(summary.totalSentCents)}
+              </Text>
+            </View>
+            <View style={styles.heroChip}>
+              <Text style={styles.heroChipLabel}>Received</Text>
+              <Text style={styles.heroChipValue}>
+                {formatAmountFromCents(summary.totalReceivedCents)}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.listWrap}>
+          {loading ? (
+            <FeedbackState
+              variant="loading"
+              title="Loading ledger..."
+              subtitle="Pulling your latest entries."
+            />
+          ) : (
+            <SectionList
+              sections={sections}
+              keyExtractor={(item) => item.txnId}
+              renderSectionHeader={({ section }) => (
+                <Text style={styles.sectionHeader}>{section.title}</Text>
+              )}
+              renderItem={({ item }) => (
+                <RecipientTransactionItem item={item} perspective="COWORKER" />
+              )}
+              stickySectionHeadersEnabled={false}
+              ListEmptyComponent={
+                <EmptyState
+                  title="No transactions yet"
+                  subtitle="Your ledger will appear here once entries are added."
+                />
+              }
+              contentContainerStyle={
+                sections.length === 0 ? styles.emptyContainer : styles.listContainer
+              }
+              showsVerticalScrollIndicator={false}
+            />
+          )}
+        </View>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
     backgroundColor: colors.background,
-    padding: spacing.lg,
+  },
+  contentWrap: {
+    flex: 1,
+    paddingHorizontal: spacing.screenHorizontal,
+    paddingTop: spacing.lg,
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
+    alignItems: 'flex-start',
   },
   title: {
-    ...typography.title,
+    ...typography.heading,
     color: colors.text,
   },
   subtitle: {
@@ -108,29 +175,59 @@ const styles = StyleSheet.create({
     color: colors.muted,
     marginTop: spacing.xs,
   },
-  summaryCard: {
+  heroCard: {
+    marginTop: spacing.md,
     backgroundColor: colors.card,
     borderRadius: 12,
-    borderColor: colors.border,
     borderWidth: 1,
+    borderColor: colors.border,
     padding: spacing.lg,
-    marginBottom: spacing.md,
   },
-  summaryText: {
-    fontSize: 13,
+  heroLabel: {
+    ...typography.caption,
+    color: colors.muted,
+  },
+  heroValue: {
+    ...typography.heading,
     color: colors.text,
-    marginBottom: spacing.xs,
-  },
-  summaryNet: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.primary,
     marginTop: spacing.xs,
   },
+  heroRow: {
+    flexDirection: 'row',
+    marginTop: spacing.sm,
+  },
+  heroChip: {
+    flex: 1,
+    backgroundColor: colors.chip,
+    borderRadius: 10,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    marginRight: spacing.sm,
+  },
+  heroChipLabel: {
+    ...typography.caption,
+    color: colors.muted,
+  },
+  heroChipValue: {
+    ...typography.bodyStrong,
+    color: colors.text,
+    marginTop: spacing.xxs,
+  },
+  listWrap: {
+    flex: 1,
+    marginTop: spacing.md,
+  },
+  sectionHeader: {
+    ...typography.caption,
+    color: colors.muted,
+    marginBottom: spacing.xs,
+    marginTop: spacing.sm,
+  },
   listContainer: {
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.lg,
   },
   emptyContainer: {
     flexGrow: 1,
+    justifyContent: 'center',
   },
 });

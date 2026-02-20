@@ -51,7 +51,11 @@ export default function RootNavigator() {
   if (!session) {
     return (
       <Stack.Navigator screenOptions={commonScreenOptions}>
-        <Stack.Screen name="Welcome" component={WelcomeScreen} />
+        <Stack.Screen
+          name="Welcome"
+          component={WelcomeScreen}
+          options={{ headerShown: false }}
+        />
       </Stack.Navigator>
     );
   }
@@ -62,7 +66,7 @@ export default function RootNavigator() {
         <Stack.Screen
           name="AdminHome"
           component={AdminHomeScreen}
-          options={{ title: 'Admin Home' }}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="RecipientLedger"
@@ -93,7 +97,7 @@ export default function RootNavigator() {
       <Stack.Screen
         name="CoworkerHome"
         component={CoworkerHomeScreen}
-        options={{ title: 'My Ledger' }}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );
