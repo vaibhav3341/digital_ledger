@@ -1,5 +1,6 @@
 import React from 'react';
 import { SectionList, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import EmptyState from '../components/EmptyState';
 import FeedbackState from '../components/FeedbackState';
 import OverflowMenu from '../components/OverflowMenu';
@@ -20,18 +21,12 @@ interface MonthSection {
   data: ReturnType<typeof useRecipientTransactions>['transactions'];
 }
 
-function monthLabel(date: Date) {
-  return date.toLocaleString('en-IN', {
-    month: 'long',
-    year: 'numeric',
-  });
-}
-
 function monthKey(date: Date) {
   return `${date.getFullYear()}-${date.getMonth() + 1}`;
 }
 
 export default function CoworkerHomeScreen() {
+  const { t, i18n } = useTranslation();
   const { session, signOut } = useSession();
   const recipientId =
     session?.role === 'COWORKER' ? session.recipientId : undefined;
@@ -45,6 +40,7 @@ export default function CoworkerHomeScreen() {
   );
 
   const [signingOut, setSigningOut] = React.useState(false);
+  const monthLocale = i18n.language === 'hi' ? 'hi-IN' : 'en-IN';
 
   const sections = React.useMemo<MonthSection[]>(() => {
     const groups: Record<string, MonthSection> = {};
@@ -56,7 +52,10 @@ export default function CoworkerHomeScreen() {
       }
       const key = monthKey(date);
       if (!groups[key]) {
-        groups[key] = { title: monthLabel(date), data: [] };
+        groups[key] = {
+          title: date.toLocaleString(monthLocale, { month: 'long', year: 'numeric' }),
+          data: [],
+        };
       }
       groups[key].data.push(transaction);
     });
@@ -64,7 +63,7 @@ export default function CoworkerHomeScreen() {
     return Object.keys(groups)
       .sort((left, right) => (left < right ? 1 : -1))
       .map((key) => groups[key]);
-  }, [transactions]);
+  }, [monthLocale, transactions]);
 
   const handleSignOut = async () => {
     try {
@@ -81,13 +80,13 @@ export default function CoworkerHomeScreen() {
         <View style={styles.headerRow}>
           <View>
             <Text style={styles.title}>{recipientName}</Text>
-            <Text style={styles.subtitle}>My ledger</Text>
+            <Text style={styles.subtitle}>{t('ledger.viewOnly')}</Text>
           </View>
           <OverflowMenu
-            triggerLabel="Account"
+            triggerLabel={t('common.account')}
             items={[
               {
-                label: signingOut ? 'Signing out...' : 'Sign Out',
+                label: signingOut ? t('common.signingOut') : t('common.signOut'),
                 onPress: handleSignOut,
                 disabled: signingOut,
               },
@@ -96,19 +95,19 @@ export default function CoworkerHomeScreen() {
         </View>
 
         <View style={styles.heroCard}>
-          <Text style={styles.heroLabel}>Net balance</Text>
+          <Text style={styles.heroLabel}>{t('ledger.netBalance')}</Text>
           <Text style={styles.heroValue}>
             {formatSignedAmountFromCents(summary.netCents)}
           </Text>
           <View style={styles.heroRow}>
             <View style={styles.heroChip}>
-              <Text style={styles.heroChipLabel}>Sent</Text>
+              <Text style={styles.heroChipLabel}>{t('ledger.sent')}</Text>
               <Text style={styles.heroChipValue}>
                 {formatAmountFromCents(summary.totalSentCents)}
               </Text>
             </View>
             <View style={styles.heroChip}>
-              <Text style={styles.heroChipLabel}>Received</Text>
+              <Text style={styles.heroChipLabel}>{t('ledger.received')}</Text>
               <Text style={styles.heroChipValue}>
                 {formatAmountFromCents(summary.totalReceivedCents)}
               </Text>
@@ -120,8 +119,8 @@ export default function CoworkerHomeScreen() {
           {loading ? (
             <FeedbackState
               variant="loading"
-              title="Loading ledger..."
-              subtitle="Pulling your latest entries."
+              title={t('ledger.loadingLedger')}
+              subtitle={t('ledger.loadingLedgerHint')}
             />
           ) : (
             <SectionList
@@ -136,8 +135,8 @@ export default function CoworkerHomeScreen() {
               stickySectionHeadersEnabled={false}
               ListEmptyComponent={
                 <EmptyState
-                  title="No transactions yet"
-                  subtitle="Your ledger will appear here once entries are added."
+                  title={t('ledger.noTransactions')}
+                  subtitle={t('ledger.ledgerEmpty')}
                 />
               }
               contentContainerStyle={

@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { Menu, Modal, Portal, Snackbar } from 'react-native-paper';
+import { useTranslation } from 'react-i18next';
 import Button from '../components/Button';
 import FilterMenuButton from '../components/FilterMenuButton';
 import SegmentedControl, {
@@ -36,25 +37,6 @@ type DurationMode = 'TILL_DATE' | 'THIS_MONTH' | 'CUSTOM';
 type DateTarget = 'START' | 'END';
 
 const ALL_RECIPIENTS_FILTER = 'ALL';
-const durationOptions: SegmentedControlOption<DurationMode>[] = [
-  { value: 'TILL_DATE', label: 'Till date' },
-  { value: 'THIS_MONTH', label: 'This month' },
-  { value: 'CUSTOM', label: 'Custom' },
-];
-const monthNames = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
 const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 function todayDate() {
@@ -129,6 +111,7 @@ async function ensureLegacyStoragePermission() {
 }
 
 export default function GetStatementScreen() {
+  const { t, i18n } = useTranslation();
   const { session } = useSession();
   const ledgerId = session?.role === 'ADMIN' ? session.ledgerId : undefined;
   const adminName = session?.role === 'ADMIN' ? session.adminName : 'Admin';
@@ -153,6 +136,14 @@ export default function GetStatementScreen() {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [lastSavedLabel, setLastSavedLabel] = useState('');
   const [lastSavedUri, setLastSavedUri] = useState('');
+  const durationOptions = useMemo<SegmentedControlOption<DurationMode>[]>(
+    () => [
+      { value: 'TILL_DATE', label: t('statement.tillDate') },
+      { value: 'THIS_MONTH', label: t('statement.thisMonth') },
+      { value: 'CUSTOM', label: t('statement.customRange') },
+    ],
+    [t],
+  );
 
   const recipientNameById = useMemo(() => {
     const map: Record<string, string> = {};
@@ -173,8 +164,8 @@ export default function GetStatementScreen() {
 
   const selectedRecipientLabel =
     recipientFilterId === ALL_RECIPIENTS_FILTER
-      ? 'All people'
-      : recipientNameById[recipientFilterId] || 'Selected person';
+      ? t('statement.allRecipients')
+      : recipientNameById[recipientFilterId] || t('common.selectedRecipient');
 
   const calendarDays = useMemo(
     () => buildCalendarDays(calendarMonthCursor),
@@ -196,7 +187,7 @@ export default function GetStatementScreen() {
     try {
       await Linking.openURL(lastSavedUri);
     } catch (error) {
-      Alert.alert('Unable to open statement', String(error));
+      Alert.alert(t('statement.unableToOpen'), String(error));
     }
   };
 
@@ -210,19 +201,19 @@ export default function GetStatementScreen() {
         url: lastSavedUri,
       });
     } catch (error) {
-      Alert.alert('Unable to share statement', String(error));
+      Alert.alert(t('statement.unableToShare'), String(error));
     }
   };
 
   const handleGenerateStatement = async () => {
     if (!ledgerId) {
-      Alert.alert('Admin session required');
+      Alert.alert(t('statement.adminRequired'));
       return;
     }
 
     const canWriteToDownloads = await ensureLegacyStoragePermission();
     if (!canWriteToDownloads) {
-      Alert.alert('Storage permission is required to save statement.');
+      Alert.alert(t('statement.storagePermission'));
       return;
     }
 
@@ -235,7 +226,7 @@ export default function GetStatementScreen() {
       const start = startOfDay(customStartDate);
       const end = endOfDay(customEndDate);
       if (start.getTime() > end.getTime()) {
-        Alert.alert('Start date cannot be after end date');
+        Alert.alert(t('statement.startAfterEnd'));
         return;
       }
       startDate = start;
@@ -276,10 +267,12 @@ export default function GetStatementScreen() {
       const downloadResult = await saveStatementToDownloads(generated);
       setLastSavedLabel(downloadResult.downloadsPathLabel);
       setLastSavedUri(downloadResult.downloadsUri);
-      setSnackbarMessage(`Saved to ${downloadResult.downloadsPathLabel}`);
+      setSnackbarMessage(
+        t('statement.savedTo', { path: downloadResult.downloadsPathLabel }),
+      );
       setSnackbarVisible(true);
     } catch (error) {
-      Alert.alert('Failed to generate statement', String(error));
+      Alert.alert(t('statement.failedToGenerate'), String(error));
     } finally {
       setLoading(false);
     }
@@ -293,13 +286,13 @@ export default function GetStatementScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.card}>
-          <Text style={styles.sectionLabel}>Scope</Text>
+          <Text style={styles.sectionLabel}>{t('statement.recipient')}</Text>
           <Menu
             visible={recipientMenuVisible}
             onDismiss={() => setRecipientMenuVisible(false)}
             anchor={
               <FilterMenuButton
-                label="People"
+                label={t('admin.view.people')}
                 value={selectedRecipientLabel}
                 onPress={() => setRecipientMenuVisible(true)}
                 style={styles.selectorControl}
@@ -311,7 +304,7 @@ export default function GetStatementScreen() {
                 setRecipientFilterId(ALL_RECIPIENTS_FILTER);
                 setRecipientMenuVisible(false);
               }}
-              title="All people"
+              title={t('statement.allRecipients')}
             />
             {recipients.length > 0 ? (
               recipients.map((recipient) => (
@@ -325,13 +318,13 @@ export default function GetStatementScreen() {
                 />
               ))
             ) : (
-              <Menu.Item disabled onPress={() => {}} title="No recipients" />
+              <Menu.Item disabled onPress={() => {}} title={t('admin.noRecipients')} />
             )}
           </Menu>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionLabel}>Range</Text>
+          <Text style={styles.sectionLabel}>{t('statement.duration')}</Text>
           <SegmentedControl
             value={durationMode}
             options={durationOptions}
@@ -349,7 +342,7 @@ export default function GetStatementScreen() {
                   pressed ? styles.dateFieldPressed : null,
                 ]}
               >
-                <Text style={styles.dateFieldLabel}>Start</Text>
+                <Text style={styles.dateFieldLabel}>{t('statement.startDate')}</Text>
                 <Text style={styles.dateFieldValue}>
                   {formatDateDDMMYYYY(customStartDate)}
                 </Text>
@@ -362,7 +355,7 @@ export default function GetStatementScreen() {
                   pressed ? styles.dateFieldPressed : null,
                 ]}
               >
-                <Text style={styles.dateFieldLabel}>End</Text>
+                <Text style={styles.dateFieldLabel}>{t('statement.endDate')}</Text>
                 <Text style={styles.dateFieldValue}>
                   {formatDateDDMMYYYY(customEndDate)}
                 </Text>
@@ -371,17 +364,22 @@ export default function GetStatementScreen() {
           ) : (
             <Text style={styles.metaText}>
               {durationMode === 'THIS_MONTH'
-                ? `From ${formatDateDDMMYYYY(monthStartDate())} to ${formatDateDDMMYYYY(
-                    todayDate(),
-                  )}`
-                : `Up to ${formatDateDDMMYYYY(todayDate())}`}
+                ? t('statement.thisMonthHint', {
+                    start: formatDateDDMMYYYY(monthStartDate()),
+                    end: formatDateDDMMYYYY(todayDate()),
+                  })
+                : t('statement.tillDateHint', {
+                    date: formatDateDDMMYYYY(todayDate()),
+                  })}
             </Text>
           )}
         </View>
 
         <View style={styles.outputCard}>
-          <Text style={styles.sectionLabel}>Output</Text>
-          <Text style={styles.outputText}>Recipient {selectedRecipientLabel}</Text>
+          <Text style={styles.sectionLabel}>{t('statement.output')}</Text>
+          <Text style={styles.outputText}>
+            {t('statement.recipientSummary', { recipient: selectedRecipientLabel })}
+          </Text>
           <Text style={styles.outputMeta}>
             {durationMode === 'CUSTOM'
               ? `${formatDateDDMMYYYY(customStartDate)} to ${formatDateDDMMYYYY(
@@ -391,20 +389,20 @@ export default function GetStatementScreen() {
                 ? `${formatDateDDMMYYYY(monthStartDate())} to ${formatDateDDMMYYYY(
                     todayDate(),
                   )}`
-                : `Till ${formatDateDDMMYYYY(todayDate())}`}
+                : `${t('statement.tillDate')} ${formatDateDDMMYYYY(todayDate())}`}
           </Text>
 
           {lastSavedLabel ? (
             <View style={styles.secondaryActions}>
               <Button
-                label="Open"
+                label={t('statement.open')}
                 variant="secondary"
                 size="compact"
                 onPress={handleOpenSavedStatement}
                 style={styles.secondaryButton}
               />
               <Button
-                label="Share"
+                label={t('statement.share')}
                 variant="secondary"
                 size="compact"
                 onPress={handleShareSavedStatement}
@@ -418,7 +416,7 @@ export default function GetStatementScreen() {
       <StickyActionBar
         actions={[
           {
-            label: loading ? 'Generating...' : 'Generate Statement',
+            label: loading ? t('statement.generating') : t('statement.generate'),
             onPress: handleGenerateStatement,
             disabled: loading,
             loading,
@@ -432,7 +430,7 @@ export default function GetStatementScreen() {
           onDismiss={() => setDatePickerVisible(false)}
           contentContainerStyle={styles.modalContainer}
         >
-          <Text style={styles.modalTitle}>Select date</Text>
+          <Text style={styles.modalTitle}>{t('statement.selectDate')}</Text>
           <View style={styles.monthHeader}>
             <Pressable
               onPress={() =>
@@ -450,8 +448,10 @@ export default function GetStatementScreen() {
               <Text style={styles.monthArrowText}>{'<'}</Text>
             </Pressable>
             <Text style={styles.monthHeaderText}>
-              {monthNames[calendarMonthCursor.getMonth()]}{' '}
-              {calendarMonthCursor.getFullYear()}
+              {calendarMonthCursor.toLocaleString(
+                i18n.language === 'hi' ? 'hi-IN' : 'en-IN',
+                { month: 'long', year: 'numeric' },
+              )}
             </Text>
             <Pressable
               onPress={() =>
@@ -521,7 +521,7 @@ export default function GetStatementScreen() {
           </View>
 
           <Button
-            label="Close"
+            label={t('common.close')}
             variant="ghost"
             onPress={() => setDatePickerVisible(false)}
           />
@@ -535,7 +535,7 @@ export default function GetStatementScreen() {
         action={
           lastSavedUri
             ? {
-                label: 'Open',
+                label: t('statement.open'),
                 onPress: handleOpenSavedStatement,
               }
             : undefined

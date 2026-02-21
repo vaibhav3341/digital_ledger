@@ -3,6 +3,7 @@ import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Chip } from 'react-native-paper';
+import { useTranslation } from 'react-i18next';
 import EmptyState from '../components/EmptyState';
 import FeedbackState from '../components/FeedbackState';
 import RecipientTransactionItem from '../components/RecipientTransactionItem';
@@ -22,6 +23,7 @@ import { summarizeTransactions } from '../utils/transactions';
 type DirectionFilter = 'ALL' | 'SENT' | 'RECEIVED';
 
 export default function RecipientLedgerScreen() {
+  const { t } = useTranslation();
   const route = useRoute<RouteProp<RootStackParamList, 'RecipientLedger'>>();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -41,10 +43,10 @@ export default function RecipientLedgerScreen() {
   }, [directionFilter, transactions]);
 
   const handleDeleteTransaction = (txnId: string) => {
-    Alert.alert('Delete transaction', 'Delete this recipient transaction?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('ledger.deleteTransaction'), t('ledger.deleteTransactionConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: () => {
           void (async () => {
@@ -52,7 +54,7 @@ export default function RecipientLedgerScreen() {
               setDeletingTxnId(txnId);
               await deleteTransactionEntry({ txnId });
             } catch (error) {
-              Alert.alert('Failed to delete transaction', String(error));
+              Alert.alert(t('ledger.failedToDelete'), String(error));
             } finally {
               setDeletingTxnId((current) => (current === txnId ? null : current));
             }
@@ -69,19 +71,19 @@ export default function RecipientLedgerScreen() {
           <Text style={styles.summaryTitle}>{recipientName}</Text>
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Sent</Text>
+              <Text style={styles.summaryLabel}>{t('ledger.sent')}</Text>
               <Text style={styles.summaryValue}>
                 {formatAmountFromCents(summary.totalSentCents)}
               </Text>
             </View>
             <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Received</Text>
+              <Text style={styles.summaryLabel}>{t('ledger.received')}</Text>
               <Text style={styles.summaryValue}>
                 {formatAmountFromCents(summary.totalReceivedCents)}
               </Text>
             </View>
             <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Net</Text>
+              <Text style={styles.summaryLabel}>{t('common.net')}</Text>
               <Text style={styles.summaryValue}>
                 {formatSignedAmountFromCents(summary.netCents)}
               </Text>
@@ -95,21 +97,21 @@ export default function RecipientLedgerScreen() {
             onPress={() => setDirectionFilter('ALL')}
             style={styles.filterChip}
           >
-            All
+            {t('common.all')}
           </Chip>
           <Chip
             selected={directionFilter === 'SENT'}
             onPress={() => setDirectionFilter('SENT')}
             style={styles.filterChip}
           >
-            Sent
+            {t('ledger.sent')}
           </Chip>
           <Chip
             selected={directionFilter === 'RECEIVED'}
             onPress={() => setDirectionFilter('RECEIVED')}
             style={styles.filterChip}
           >
-            Received
+            {t('ledger.received')}
           </Chip>
         </View>
 
@@ -117,8 +119,8 @@ export default function RecipientLedgerScreen() {
           {loading ? (
             <FeedbackState
               variant="loading"
-              title="Loading transactions..."
-              subtitle="Pulling recipient history."
+              title={t('ledger.loadingTransactions')}
+              subtitle={t('ledger.loadingTransactionsHint')}
             />
           ) : (
             <FlatList
@@ -135,8 +137,8 @@ export default function RecipientLedgerScreen() {
               )}
               ListEmptyComponent={
                 <EmptyState
-                  title="No transactions yet"
-                  subtitle="Use Send or Receive to add the first entry."
+                  title={t('ledger.noRecipientTransactions')}
+                  subtitle={t('ledger.noRecipientEntries')}
                 />
               }
               contentContainerStyle={
@@ -154,7 +156,7 @@ export default function RecipientLedgerScreen() {
         <StickyActionBar
           actions={[
             {
-              label: 'Send',
+              label: t('ledger.send'),
               onPress: () =>
                 navigation.navigate('AddTransaction', {
                   recipientId,
@@ -163,7 +165,7 @@ export default function RecipientLedgerScreen() {
                 }),
             },
             {
-              label: 'Receive',
+              label: t('ledger.receive'),
               variant: 'secondary',
               onPress: () =>
                 navigation.navigate('AddTransaction', {
